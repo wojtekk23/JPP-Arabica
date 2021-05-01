@@ -1,2 +1,2 @@
 # JPP-Arabica
-Little imperative language created during JPP course
+Little imperative language created during MIMUW's JPP course
