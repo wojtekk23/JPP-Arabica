@@ -1,0 +1,26 @@
+// Lambda 1
+// Wypisuje 12 razy "YES"
+
+int main() {
+    Array<int> new_arr = new int[13];
+    int x = -2, y = 2;
+    string yes_str = "YES", no_str = "NO";
+    
+    [ int ] ( int, int ) mul = [int](int a, int x){
+        return a*x;
+    };
+    
+    for i = 0 to 12 do {
+        arr[i] = mul(y, i);
+        x = x + y;
+        
+        if (arr[i] == x) {
+            print(yes_str);
+        }
+        else {
+            print(no_str);
+        }
+    }
+    
+    return 0;
+}

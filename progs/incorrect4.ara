@@ -1,0 +1,6 @@
+// main nie może przyjmować argumentów
+// Program sparsuje się, interpreter zgłosi błąd przed wykonaniem
+
+int main(int a, int b, int c) {
+    return 0;
+}

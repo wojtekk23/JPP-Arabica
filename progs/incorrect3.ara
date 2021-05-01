@@ -1,0 +1,12 @@
+// Warunek musi być wyrażeniem typu bool
+// Program nie sparsuje się
+
+int main() {
+    if (int x = 1) {
+        print("help 1");
+    } else {
+        print("help 2");
+    }
+    
+    return 0;
+}

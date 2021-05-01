@@ -1,0 +1,18 @@
+// Wypisuje "World" 42 razy
+
+int main() {
+    string x = "Hello";
+    
+    bool y = 1 + 2 * 3 == 7;
+    int x = 42;
+    
+    while (y) {
+        print ("World!");
+        x--;
+        
+        if (x == 0)
+            break;
+    }
+    
+    return 0;
+}

@@ -1,0 +1,12 @@
+// Brak zadeklarowanej zmiennej
+// Interpreter wyrzuci błąd przed wykonaniem programu
+
+int main() {
+    [int]() f = [int]() { return x; };
+    int x = 1;
+    
+    // Błąd: brak zadeklarowanej zmiennej
+    f();
+    
+    return 0;
+}
