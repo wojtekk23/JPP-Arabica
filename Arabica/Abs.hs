@@ -7,7 +7,7 @@
 
 module Arabica.Abs where
 
-import Prelude (Integer, String)
+import Prelude (Integer, String, Bool)
 import qualified Prelude as C (Eq, Ord, Show, Read)
 import qualified Data.String
 
@@ -79,4 +79,6 @@ data RelOp = LTH | LE | GTH | GE | EQU | NE
 
 newtype Ident = Ident String
   deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
+
+data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal
 

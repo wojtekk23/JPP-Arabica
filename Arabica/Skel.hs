@@ -4,36 +4,52 @@
 
 module Arabica.Skel where
 
-import Prelude (($), Either(..), String, (++), Show, show)
+-- import Prelude (($), Either(..), String, (++), Show, show)
 import qualified Arabica.Abs
+import qualified Data.Map as M
+import Control.Monad.State
+import Control.Monad.Reader
+
+import Control.Monad.Trans.Maybe
+
+type ExpEnv = M.Map Arabica.Abs.Ident (Integer, Bool)
+type ExpM a = ReaderT ExpEnv Maybe a
+type InterpretingMonadIO a = StateT ExpEnv (MaybeT IO) a
 
 type Err = Either String
-type Result = Err String
+type Result = ExpM Arabica.Abs.LocVal
 
-failure :: Show a => a -> Result
-failure x = Left $ "Undefined case: " ++ show x
+errorExpM :: ExpM a
+errorExpM = lift $ Nothing
 
-transIdent :: Arabica.Abs.Ident -> Result
+errorInterpretingMonadIO :: InterpretingMonadIO a
+errorInterpretingMonadIO = lift $ MaybeT $ return Nothing
+
+failure :: Show a => a -> InterpretingMonadIO ()
+-- failure x = Left $ "Undefined case: " ++ show x
+failure _ = errorInterpretingMonadIO
+
+transIdent :: Arabica.Abs.Ident -> InterpretingMonadIO ()
 transIdent x = case x of
   Arabica.Abs.Ident string -> failure x
 
-transProgram :: Arabica.Abs.Program -> Result
+transProgram :: Arabica.Abs.Program -> InterpretingMonadIO ()
 transProgram x = case x of
   Arabica.Abs.Program topdefs -> failure x
 
-transTopDef :: Arabica.Abs.TopDef -> Result
+transTopDef :: Arabica.Abs.TopDef -> InterpretingMonadIO ()
 transTopDef x = case x of
   Arabica.Abs.FnDef type_ ident args block -> failure x
 
-transArg :: Arabica.Abs.Arg -> Result
+transArg :: Arabica.Abs.Arg -> InterpretingMonadIO ()
 transArg x = case x of
   Arabica.Abs.Arg type_ ident -> failure x
 
-transBlock :: Arabica.Abs.Block -> Result
+transBlock :: Arabica.Abs.Block -> InterpretingMonadIO ()
 transBlock x = case x of
   Arabica.Abs.Block stmts -> failure x
 
-transStmt :: Arabica.Abs.Stmt -> Result
+transStmt :: Arabica.Abs.Stmt -> InterpretingMonadIO ()
 transStmt x = case x of
   Arabica.Abs.Empty -> failure x
   Arabica.Abs.BStmt block -> failure x
@@ -53,12 +69,12 @@ transStmt x = case x of
   Arabica.Abs.ForTo item expr stmt -> failure x
   Arabica.Abs.Print expr -> failure x
 
-transItem :: Arabica.Abs.Item -> Result
+transItem :: Arabica.Abs.Item -> InterpretingMonadIO ()
 transItem x = case x of
   Arabica.Abs.NoInit ident -> failure x
   Arabica.Abs.Init ident expr -> failure x
 
-transType :: Arabica.Abs.Type -> Result
+transType :: Arabica.Abs.Type -> InterpretingMonadIO ()
 transType x = case x of
   Arabica.Abs.Int -> failure x
   Arabica.Abs.Str -> failure x
@@ -69,38 +85,42 @@ transType x = case x of
 
 transExpr :: Arabica.Abs.Expr -> Result
 transExpr x = case x of
-  Arabica.Abs.EArray type_ integer -> failure x
-  Arabica.Abs.EArrElem ident expr -> failure x
-  Arabica.Abs.ELambda type_ args block -> failure x
-  Arabica.Abs.EVar ident -> failure x
-  Arabica.Abs.ELitInt integer -> failure x
-  Arabica.Abs.ELitTrue -> failure x
-  Arabica.Abs.ELitFalse -> failure x
-  Arabica.Abs.EApp ident exprs -> failure x
-  Arabica.Abs.EString string -> failure x
-  Arabica.Abs.Neg expr -> failure x
-  Arabica.Abs.Not expr -> failure x
-  Arabica.Abs.EMul expr1 mulop expr2 -> failure x
-  Arabica.Abs.EAdd expr1 addop expr2 -> failure x
-  Arabica.Abs.ERel expr1 relop expr2 -> failure x
-  Arabica.Abs.EAnd expr1 expr2 -> failure x
-  Arabica.Abs.EOr expr1 expr2 -> failure x
+  Arabica.Abs.EArray type_ integer -> errorExpM
+  Arabica.Abs.EArrElem ident expr -> errorExpM
+  Arabica.Abs.ELambda type_ args block -> errorExpM
+  Arabica.Abs.EVar ident -> errorExpM
+  Arabica.Abs.ELitInt integer -> pure $ Arabica.Abs.IntegerVal $ integer
+  Arabica.Abs.ELitTrue -> pure $ Arabica.Abs.BoolVal $ True
+  Arabica.Abs.ELitFalse -> pure $ Arabica.Abs.BoolVal $ False
+  Arabica.Abs.EApp ident exprs -> errorExpM
+  Arabica.Abs.EString string -> pure $ Arabica.Abs.StringVal $ string
+  Arabica.Abs.Neg expr -> errorExpM
+  Arabica.Abs.Not expr -> errorExpM
+  Arabica.Abs.EMul expr1 mulop expr2 -> errorExpM
+  Arabica.Abs.EAdd expr1 addop expr2 -> errorExpM
+  Arabica.Abs.ERel expr1 relop expr2 -> errorExpM
+  Arabica.Abs.EAnd expr1 expr2 -> errorExpM
+  Arabica.Abs.EOr expr1 expr2 -> errorExpM
 
-transAddOp :: Arabica.Abs.AddOp -> Result
-transAddOp x = case x of
-  Arabica.Abs.Plus -> failure x
-  Arabica.Abs.Minus -> failure x
+transAddOp :: Arabica.Abs.AddOp -> Integer -> Integer -> ExpM Integer
+transAddOp x n1 n2 = case x of
+  Arabica.Abs.Plus -> pure $ n1 + n2
+  Arabica.Abs.Minus -> pure $ n1 - n2
 
-transMulOp :: Arabica.Abs.MulOp -> Result
-transMulOp x = case x of
-  Arabica.Abs.Times -> failure x
-  Arabica.Abs.Div -> failure x
+transMulOp :: Arabica.Abs.MulOp -> Integer -> Integer -> ExpM Integer
+transMulOp x n1 n2 = case x of
+  Arabica.Abs.Times -> pure $ n1 * n2
+  Arabica.Abs.Div -> do
+    if n2 == 0 then
+      errorExpM
+    else
+      pure $ n1 `div` n2
 
-transRelOp :: Arabica.Abs.RelOp -> Result
-transRelOp x = case x of
-  Arabica.Abs.LTH -> failure x
-  Arabica.Abs.LE -> failure x
-  Arabica.Abs.GTH -> failure x
-  Arabica.Abs.GE -> failure x
-  Arabica.Abs.EQU -> failure x
-  Arabica.Abs.NE -> failure x
+transRelOp :: Arabica.Abs.RelOp -> Integer -> Integer -> ExpM Bool
+transRelOp x n1 n2 = case x of
+  Arabica.Abs.LTH -> pure $ n1 < n2
+  Arabica.Abs.LE -> pure $ n1 <= n2
+  Arabica.Abs.GTH -> pure $ n1 > n2
+  Arabica.Abs.GE -> pure $ n1 >= n2
+  Arabica.Abs.EQU -> pure $ n1 == n2
+  Arabica.Abs.NE -> pure $ n1 /= n2
