@@ -81,4 +81,5 @@ newtype Ident = Ident String
   deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
 
 data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal
+  deriving (C.Show)
 

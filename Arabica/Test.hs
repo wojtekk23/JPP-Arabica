@@ -11,16 +11,20 @@ import Prelude
   , IO, (>>), (>>=), mapM_, putStrLn
   , FilePath
   , getContents, readFile
+  , Maybe(..)
   )
 import System.Environment ( getArgs )
 import System.Exit        ( exitFailure, exitSuccess )
 import Control.Monad      ( when )
 
-import Arabica.Abs   ()
+import Arabica.Abs   ( Program )
 import Arabica.Lex   ( Token )
 import Arabica.Par   ( pProgram, myLexer )
 import Arabica.Print ( Print, printTree )
-import Arabica.Skel  ()
+import Arabica.Skel  ( transProgram )
+import Control.Monad.Trans.Maybe
+import qualified Data.Map as M
+import Control.Monad.State
 
 type Err        = Either String
 type ParseFun a = [Token] -> Err a
@@ -48,6 +52,26 @@ run v p s =
   where
   ts = myLexer s
 
+runProgram :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
+runProgram v p s =
+  case p ts of
+    Left err -> do
+      putStrLn "\nParse              Failed...\n"
+      putStrV v "Tokens:"
+      putStrV v $ show ts
+      putStrLn err
+      exitFailure
+    Right tree -> do
+      putStrLn "\nParse Successful!"
+      -- showTree v tree
+      expEnv <- runMaybeT $ execStateT (transProgram tree) M.empty
+      case expEnv of
+        Nothing -> putStrLn "ERROR"
+        Just newEnv -> putStrLn $ show newEnv
+      exitSuccess
+  where
+  ts = myLexer s
+
 showTree :: (Show a, Print a) => Int -> a -> IO ()
 showTree v tree = do
   putStrV v $ "\n[Abstract Syntax]\n\n" ++ show tree
@@ -69,7 +93,7 @@ main = do
   args <- getArgs
   case args of
     ["--help"] -> usage
-    []         -> getContents >>= run 2 pProgram
+    []         -> getContents >>= runProgram 2 pProgram
     "-s":fs    -> mapM_ (runFile 0 pProgram) fs
     fs         -> mapM_ (runFile 2 pProgram) fs
 

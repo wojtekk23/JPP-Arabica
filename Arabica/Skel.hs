@@ -12,7 +12,7 @@ import Control.Monad.Reader
 
 import Control.Monad.Trans.Maybe
 
-type ExpEnv = M.Map Arabica.Abs.Ident (Integer, Bool)
+type ExpEnv = M.Map Arabica.Abs.Ident Arabica.Abs.LocVal
 type ExpM a = ReaderT ExpEnv Maybe a
 type InterpretingMonadIO a = StateT ExpEnv (MaybeT IO) a
 
@@ -35,11 +35,15 @@ transIdent x = case x of
 
 transProgram :: Arabica.Abs.Program -> InterpretingMonadIO ()
 transProgram x = case x of
-  Arabica.Abs.Program topdefs -> failure x
+  Arabica.Abs.Program topdefs -> mapM_ transTopDef topdefs
 
 transTopDef :: Arabica.Abs.TopDef -> InterpretingMonadIO ()
 transTopDef x = case x of
-  Arabica.Abs.FnDef type_ ident args block -> failure x
+  Arabica.Abs.FnDef type_ ident args block -> do
+    -- Na razie tylko uruchamiaj main
+    let Arabica.Abs.Ident str = ident
+    if str /= "main" then pure ()
+    else transBlock block
 
 transArg :: Arabica.Abs.Arg -> InterpretingMonadIO ()
 transArg x = case x of
@@ -47,14 +51,27 @@ transArg x = case x of
 
 transBlock :: Arabica.Abs.Block -> InterpretingMonadIO ()
 transBlock x = case x of
-  Arabica.Abs.Block stmts -> failure x
+  Arabica.Abs.Block stmts -> runStmts stmts
+  where
+    runStmts [] = pure ()
+    runStmts (stmt:stmts) = do
+      env <- get
+      transStmt stmt
+      runStmts stmts
 
 transStmt :: Arabica.Abs.Stmt -> InterpretingMonadIO ()
 transStmt x = case x of
-  Arabica.Abs.Empty -> failure x
-  Arabica.Abs.BStmt block -> failure x
-  Arabica.Abs.Decl type_ items -> failure x
-  Arabica.Abs.Ass ident expr -> failure x
+  Arabica.Abs.Empty -> pure ()
+  Arabica.Abs.BStmt block -> transBlock block
+  Arabica.Abs.Decl type_ items -> do
+    -- Na razie tylko int
+    mapM_ transItem items
+  Arabica.Abs.Ass ident expr -> do
+    env <- get
+    let locVal = runReaderT (transExpr expr) env
+    case locVal of
+      Nothing -> errorInterpretingMonadIO
+      Just x -> put $ (M.insert ident x env)
   Arabica.Abs.ArrAss ident expr1 expr2 -> failure x
   Arabica.Abs.Incr ident -> failure x
   Arabica.Abs.Decr ident -> failure x
@@ -67,12 +84,24 @@ transStmt x = case x of
   Arabica.Abs.Continue -> failure x
   Arabica.Abs.SExp expr -> failure x
   Arabica.Abs.ForTo item expr stmt -> failure x
-  Arabica.Abs.Print expr -> failure x
+  Arabica.Abs.Print expr -> do
+    -- Na razie tylko inty
+    env <- get
+    let locVal = runReaderT (transExpr expr) env
+    case locVal of
+      Just (Arabica.Abs.IntegerVal x) -> lift $ lift $ putStrLn $ show x
+      _ -> errorInterpretingMonadIO
 
 transItem :: Arabica.Abs.Item -> InterpretingMonadIO ()
 transItem x = case x of
   Arabica.Abs.NoInit ident -> failure x
-  Arabica.Abs.Init ident expr -> failure x
+  Arabica.Abs.Init ident expr -> do
+    -- Na razie tylko inty
+    env <- get
+    let locVal = runReaderT (transExpr expr) env
+    case locVal of
+      Just x -> put $ (M.insert ident x env)
+      _ -> errorInterpretingMonadIO
 
 transType :: Arabica.Abs.Type -> InterpretingMonadIO ()
 transType x = case x of
@@ -88,7 +117,12 @@ transExpr x = case x of
   Arabica.Abs.EArray type_ integer -> errorExpM
   Arabica.Abs.EArrElem ident expr -> errorExpM
   Arabica.Abs.ELambda type_ args block -> errorExpM
-  Arabica.Abs.EVar ident -> errorExpM
+  Arabica.Abs.EVar ident -> do
+    env <- ask
+    let val = M.lookup ident env
+    case val of
+      Just y -> pure y
+      Nothing -> errorExpM
   Arabica.Abs.ELitInt integer -> pure $ Arabica.Abs.IntegerVal $ integer
   Arabica.Abs.ELitTrue -> pure $ Arabica.Abs.BoolVal $ True
   Arabica.Abs.ELitFalse -> pure $ Arabica.Abs.BoolVal $ False
