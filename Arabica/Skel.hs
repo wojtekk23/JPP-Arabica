@@ -94,33 +94,52 @@ transExpr x = case x of
   Arabica.Abs.ELitFalse -> pure $ Arabica.Abs.BoolVal $ False
   Arabica.Abs.EApp ident exprs -> errorExpM
   Arabica.Abs.EString string -> pure $ Arabica.Abs.StringVal $ string
-  Arabica.Abs.Neg expr -> errorExpM
-  Arabica.Abs.Not expr -> errorExpM
-  Arabica.Abs.EMul expr1 mulop expr2 -> errorExpM
-  Arabica.Abs.EAdd expr1 addop expr2 -> errorExpM
-  Arabica.Abs.ERel expr1 relop expr2 -> errorExpM
-  Arabica.Abs.EAnd expr1 expr2 -> errorExpM
-  Arabica.Abs.EOr expr1 expr2 -> errorExpM
+  Arabica.Abs.Neg expr -> do
+    Arabica.Abs.IntegerVal n <- transExpr expr
+    pure $ Arabica.Abs.IntegerVal $ (-n)
+  Arabica.Abs.Not expr -> do
+    Arabica.Abs.BoolVal b <- transExpr expr
+    pure $ Arabica.Abs.BoolVal $ not b
+  Arabica.Abs.EMul expr1 mulop expr2 -> do
+    Arabica.Abs.IntegerVal n1 <- transExpr expr1
+    Arabica.Abs.IntegerVal n2 <- transExpr expr2
+    transMulOp mulop n1 n2
+  Arabica.Abs.EAdd expr1 addop expr2 -> do
+    Arabica.Abs.IntegerVal n1 <- transExpr expr1
+    Arabica.Abs.IntegerVal n2 <- transExpr expr2
+    transAddOp addop n1 n2
+  Arabica.Abs.ERel expr1 relop expr2 -> do
+    Arabica.Abs.IntegerVal n1 <- transExpr expr1
+    Arabica.Abs.IntegerVal n2 <- transExpr expr2
+    transRelOp relop n1 n2
+  Arabica.Abs.EAnd expr1 expr2 -> do
+    Arabica.Abs.BoolVal b1 <- transExpr expr1
+    Arabica.Abs.BoolVal b2 <- transExpr expr2
+    pure $ Arabica.Abs.BoolVal $ b1 && b2
+  Arabica.Abs.EOr expr1 expr2 -> do
+    Arabica.Abs.BoolVal b1 <- transExpr expr1
+    Arabica.Abs.BoolVal b2 <- transExpr expr2
+    pure $ Arabica.Abs.BoolVal $ b1 || b2
 
-transAddOp :: Arabica.Abs.AddOp -> Integer -> Integer -> ExpM Integer
+transAddOp :: Arabica.Abs.AddOp -> Integer -> Integer -> Result
 transAddOp x n1 n2 = case x of
-  Arabica.Abs.Plus -> pure $ n1 + n2
-  Arabica.Abs.Minus -> pure $ n1 - n2
+  Arabica.Abs.Plus -> pure $ Arabica.Abs.IntegerVal $ n1 + n2
+  Arabica.Abs.Minus -> pure $ Arabica.Abs.IntegerVal $ n1 - n2
 
-transMulOp :: Arabica.Abs.MulOp -> Integer -> Integer -> ExpM Integer
+transMulOp :: Arabica.Abs.MulOp -> Integer -> Integer -> Result
 transMulOp x n1 n2 = case x of
-  Arabica.Abs.Times -> pure $ n1 * n2
+  Arabica.Abs.Times -> pure $ Arabica.Abs.IntegerVal $ n1 * n2
   Arabica.Abs.Div -> do
     if n2 == 0 then
       errorExpM
     else
-      pure $ n1 `div` n2
+      pure $ Arabica.Abs.IntegerVal $ n1 `div` n2
 
-transRelOp :: Arabica.Abs.RelOp -> Integer -> Integer -> ExpM Bool
+transRelOp :: Arabica.Abs.RelOp -> Integer -> Integer -> Result
 transRelOp x n1 n2 = case x of
-  Arabica.Abs.LTH -> pure $ n1 < n2
-  Arabica.Abs.LE -> pure $ n1 <= n2
-  Arabica.Abs.GTH -> pure $ n1 > n2
-  Arabica.Abs.GE -> pure $ n1 >= n2
-  Arabica.Abs.EQU -> pure $ n1 == n2
-  Arabica.Abs.NE -> pure $ n1 /= n2
+  Arabica.Abs.LTH -> pure $ Arabica.Abs.BoolVal $ n1 < n2
+  Arabica.Abs.LE -> pure $ Arabica.Abs.BoolVal $ n1 <= n2
+  Arabica.Abs.GTH -> pure $ Arabica.Abs.BoolVal $ n1 > n2
+  Arabica.Abs.GE -> pure $ Arabica.Abs.BoolVal $ n1 >= n2
+  Arabica.Abs.EQU -> pure $ Arabica.Abs.BoolVal $ n1 == n2
+  Arabica.Abs.NE -> pure $ Arabica.Abs.BoolVal $ n1 /= n2
