@@ -80,7 +80,7 @@ data RelOp = LTH | LE | GTH | GE | EQU | NE
 newtype Ident = Ident String
   deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
 
-data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal
+data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal | FunVal Type [Arg] Block
   deriving (C.Show)
 
 type Location = Integer

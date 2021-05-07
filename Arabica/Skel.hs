@@ -40,9 +40,10 @@ debugMessage s = lift $ lift $ lift $ putStrLn s
 
 newVariable :: Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO VarEnv
 newVariable x val = do
+  -- TODO: Na razie chyba przyzwalamy na powtórzone deklaracje, chyba trzeba będzie zmienić
   varEnv <- ask
   (locEnv, loc) <- get
-  debugMessage $ unwords [show x, show val]
+  -- debugMessage $ unwords [show x, show val]
   put $ (M.insert loc val locEnv, loc+1)
   pure $ M.insert x loc varEnv
 
@@ -74,17 +75,25 @@ transIdent x = case x of
 
 transProgram :: Arabica.Abs.Program -> InterpretingMonadIO ()
 transProgram x = case x of
-  Arabica.Abs.Program topdefs -> mapM_ transTopDef topdefs
+  Arabica.Abs.Program topdefs -> do
+    runTopDefs topdefs
+  where
+    runTopDefs [] = pure ()
+    runTopDefs (def:defs) = do
+      -- Czy powinniśmy przejmować się zwracaną wartością?
+      (varEnv, _) <- transTopDef def
+      local (const varEnv) $ runTopDefs defs
 
-transTopDef :: Arabica.Abs.TopDef -> InterpretingMonadIO ()
+transTopDef :: Arabica.Abs.TopDef -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
 transTopDef x = case x of
   Arabica.Abs.FnDef type_ ident args block -> do
     -- Na razie tylko uruchamiaj main
     let Arabica.Abs.Ident str = ident
-    if str /= "main" then pure ()
-    else do
-      transBlock block
-      pure ()
+    newVarEnv <- newVariable ident (Arabica.Abs.FunVal type_ args block)
+    if str == "main" then  do
+      newestReturn <- local (const newVarEnv) $ transBlock block
+      pure $ newestReturn
+    else pure $ (newVarEnv, Nothing)
 
 transArg :: Arabica.Abs.Arg -> InterpretingMonadIO ()
 transArg x = case x of
@@ -101,12 +110,14 @@ transBlock x = case x of
   where
     runStmts [] = noPass
     runStmts (stmt:stmts) = do
-      env <- ask
-      (locEnv, _) <- get
-      debugMessage $ unwords ["VARS", show env]
-      debugMessage $ unwords ["LOCS", show locEnv]
-      (newVarEnv, _) <- transStmt stmt
-      local (const newVarEnv) $ runStmts stmts
+      -- env <- ask
+      -- (locEnv, _) <- get
+      -- debugMessage $ unwords ["VARS", show env]
+      -- debugMessage $ unwords ["LOCS", show locEnv]
+      (newVarEnv, retVal) <- transStmt stmt
+      case retVal of
+        Just x -> pure $ (newVarEnv, retVal)
+        Nothing -> local (const newVarEnv) $ runStmts stmts
 
 transStmt :: Arabica.Abs.Stmt -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
 transStmt x = case x of
@@ -117,7 +128,7 @@ transStmt x = case x of
     case items of
       [] -> noPass
       (x:xs) -> do
-        debugMessage $ unwords ["DECL", show (x:xs)]
+        -- debugMessage $ unwords ["DECL", show (x:xs)]
         (newVarEnv, _) <- transItem x
         local (const newVarEnv) $ transStmt (Arabica.Abs.Decl type_ xs)
   Arabica.Abs.Ass ident expr -> do
@@ -132,8 +143,14 @@ transStmt x = case x of
   Arabica.Abs.ArrAss ident expr1 expr2 -> errorMessage "ArrAss"
   Arabica.Abs.Incr ident -> errorMessage "Incr"
   Arabica.Abs.Decr ident -> errorMessage "Decr"
-  Arabica.Abs.Ret expr -> errorMessage "Ret"
-  Arabica.Abs.VRet -> errorMessage "VRet"
+  Arabica.Abs.Ret expr -> do
+    retVal <- transExpr expr
+    varEnv <- ask
+    debugMessage $ unwords ["ZWRACAMY", show retVal]
+    pure $ (varEnv, Just retVal)
+  Arabica.Abs.VRet -> do
+    varEnv <- ask
+    pure $ (varEnv, Just Arabica.Abs.VoidVal)
   Arabica.Abs.Cond expr stmt -> errorMessage "Cond"
   Arabica.Abs.CondElse expr stmt1 stmt2 -> errorMessage "CondElse"
   Arabica.Abs.While expr stmt -> do
@@ -164,7 +181,7 @@ transItem x = case x of
   Arabica.Abs.Init ident expr -> do
     val <- transExpr expr
     newVarEnv <- newVariable ident val
-    debugMessage "INIT"
+    -- debugMessage "INIT"
     pure $ (newVarEnv, Nothing)
 
 transType :: Arabica.Abs.Type -> InterpretingMonadIO ()
@@ -176,6 +193,15 @@ transType x = case x of
   Arabica.Abs.Fun type_ types -> failure x
   Arabica.Abs.Array type_ -> failure x
 
+assignArgsToVals :: [Arabica.Abs.Expr] -> [Arabica.Abs.Arg] -> VarEnv -> InterpretingMonadIO VarEnv
+assignArgsToVals [] [] env = pure env
+assignArgsToVals _ [] _ = errorMessage "Too many values passed to a function"
+assignArgsToVals [] _ _ = errorMessage "Not enough values passed to a function"
+assignArgsToVals (e:es) ((Arabica.Abs.Arg type_ ident):as) _ = do
+  val <- transExpr e
+  newVarEnv <- newVariable ident val
+  assignArgsToVals es as newVarEnv
+
 transExpr :: Arabica.Abs.Expr -> InterpretingMonadIO Arabica.Abs.LocVal
 transExpr x = case x of
   Arabica.Abs.EArray type_ integer -> errorMessage "Array"
@@ -185,7 +211,18 @@ transExpr x = case x of
   Arabica.Abs.ELitInt integer -> pure $ Arabica.Abs.IntegerVal $ integer
   Arabica.Abs.ELitTrue -> pure $ Arabica.Abs.BoolVal $ True
   Arabica.Abs.ELitFalse -> pure $ Arabica.Abs.BoolVal $ False
-  Arabica.Abs.EApp ident exprs -> errorMessage "App"
+  Arabica.Abs.EApp ident exprs -> do
+    varEnv <- ask
+    maybeFun <- readVariable ident
+    case maybeFun of
+      Arabica.Abs.FunVal type_ args block -> do
+        funVarEnv <- assignArgsToVals exprs args varEnv
+        (_, retVal) <- local (const funVarEnv) $ transBlock block
+        debugMessage $ unwords ["FUNKCJA", show ident, "zwraca", show retVal]
+        case retVal of
+          Just x -> pure x
+          Nothing -> errorMessage "NIE MAMY WSPARCIA DLA PROCEDUR???"
+      _ -> errorMessage $ unwords ["Identifier", show ident, "is not a function"]
   Arabica.Abs.EString string -> pure $ Arabica.Abs.StringVal $ string
   Arabica.Abs.Neg expr -> do
     Arabica.Abs.IntegerVal n <- transExpr expr
