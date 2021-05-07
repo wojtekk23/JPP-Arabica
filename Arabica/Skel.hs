@@ -173,14 +173,18 @@ transStmt x = case x of
       _ -> errorMessage "while"
   Arabica.Abs.Break -> errorMessage "Break"
   Arabica.Abs.Continue -> errorMessage "Continue"
-  Arabica.Abs.SExp expr -> errorMessage "SExp"
+  Arabica.Abs.SExp expr -> do
+    transExpr expr
+    noPass
   Arabica.Abs.ForTo item expr stmt -> errorMessage "ForTo"
   Arabica.Abs.Print expr -> do
     -- Na razie tylko inty
     val <- transExpr expr
     case val of
       Arabica.Abs.IntegerVal n -> lift $ lift $ lift $ putStrLn $ show n
-      _ -> errorMessage "print"
+      Arabica.Abs.BoolVal b -> lift $ lift $ lift $ putStrLn $ show b
+      Arabica.Abs.StringVal s -> lift $ lift $ lift $ putStrLn $ show s
+      _ -> errorMessage "Can only print integers, booleans and strings"
     noPass
 
 transItem :: Arabica.Abs.Item -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
@@ -228,7 +232,10 @@ transExpr x = case x of
         (_, retVal) <- local (const funVarEnv) $ transBlock block
         case retVal of
           Just x -> pure x
-          Nothing -> errorMessage "NIE MAMY WSPARCIA DLA PROCEDUR???"
+          Nothing -> do
+            case type_ of
+              Arabica.Abs.Void -> pure Arabica.Abs.VoidVal
+              _ -> errorMessage $ unwords ["Function", show ident, "should return", show type_, "but returns nothing"]
       _ -> errorMessage $ unwords ["Identifier", show ident, "is not a function"]
   Arabica.Abs.EString string -> pure $ Arabica.Abs.StringVal $ string
   Arabica.Abs.Neg expr -> do

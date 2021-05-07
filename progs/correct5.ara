@@ -1,0 +1,11 @@
+// Przykład procedury
+
+void f(int x) {
+    print("Zmienna x:");
+    print(x);
+}
+
+int main() {
+    f(5);
+    return 0;
+}

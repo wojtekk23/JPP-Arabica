@@ -1,0 +1,10 @@
+// Funkcja powinna coś zwracać, ale tego nie robi
+
+int f() {
+    print("point of no return");
+}
+
+int main() {
+    int x = f();
+    return 0;
+}
