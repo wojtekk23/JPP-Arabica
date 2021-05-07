@@ -79,7 +79,17 @@ transStmt x = case x of
   Arabica.Abs.VRet -> failure x
   Arabica.Abs.Cond expr stmt -> failure x
   Arabica.Abs.CondElse expr stmt1 stmt2 -> failure x
-  Arabica.Abs.While expr stmt -> failure x
+  Arabica.Abs.While expr stmt -> do
+    env <- get
+    let locVal = runReaderT (transExpr expr) env
+    case locVal of
+      Just (Arabica.Abs.BoolVal y) -> do
+        if y then do
+          transStmt stmt
+          transStmt x
+        else
+          pure ()
+      _ -> errorInterpretingMonadIO
   Arabica.Abs.Break -> failure x
   Arabica.Abs.Continue -> failure x
   Arabica.Abs.SExp expr -> failure x

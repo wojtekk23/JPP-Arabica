@@ -1,6 +1,13 @@
 int main() {
     int x = 5;
     int y = x + 2;
+    print(y);
+
+    while (y > 0) {
+        y = y - 1;
+    }
+
+
     print( x );
     print( y );
 }
