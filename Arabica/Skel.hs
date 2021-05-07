@@ -11,23 +11,62 @@ import Control.Monad.State
 import Control.Monad.Reader
 
 import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Except
 
-type ExpEnv = M.Map Arabica.Abs.Ident Arabica.Abs.LocVal
-type ExpM a = ReaderT ExpEnv Maybe a
-type InterpretingMonadIO a = StateT ExpEnv (MaybeT IO) a
+type VarEnv = M.Map Arabica.Abs.Ident Arabica.Abs.Location
+type LocEnv = M.Map Arabica.Abs.Location Arabica.Abs.LocVal
+type LocMemory = (LocEnv, Arabica.Abs.Location)
+type ExpM a = ReaderT VarEnv Maybe a
+type InterpretingMonadIO = ReaderT VarEnv (StateT LocMemory (ExceptT String IO))
 
 type Err = Either String
-type Result = ExpM Arabica.Abs.LocVal
+type Result = InterpretingMonadIO Arabica.Abs.LocVal
 
-errorExpM :: ExpM a
-errorExpM = lift $ Nothing
+errorExpM :: InterpretingMonadIO a
+errorExpM = errorInterpretingMonadIO
 
 errorInterpretingMonadIO :: InterpretingMonadIO a
-errorInterpretingMonadIO = lift $ MaybeT $ return Nothing
+errorInterpretingMonadIO = lift $ lift $ throwE "ERROR"
 
 failure :: Show a => a -> InterpretingMonadIO ()
 -- failure x = Left $ "Undefined case: " ++ show x
 failure _ = errorInterpretingMonadIO
+
+errorMessage :: String -> InterpretingMonadIO a
+errorMessage s = lift $ lift $ throwE s
+
+debugMessage :: String -> InterpretingMonadIO ()
+debugMessage s = lift $ lift $ lift $ putStrLn s
+
+newVariable :: Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO VarEnv
+newVariable x val = do
+  varEnv <- ask
+  (locEnv, loc) <- get
+  debugMessage $ unwords [show x, show val]
+  put $ (M.insert loc val locEnv, loc+1)
+  pure $ M.insert x loc varEnv
+
+updateVariable :: Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO ()
+updateVariable x val = do
+  varEnv <- ask
+  (locEnv, lastLoc) <- get
+  let addr = M.lookup x varEnv
+  case addr of
+    Just loc -> put $ (M.insert loc val locEnv, lastLoc)
+    Nothing -> errorMessage ("No location found for variable " ++ (show x))
+
+readVariable :: Arabica.Abs.Ident -> InterpretingMonadIO Arabica.Abs.LocVal
+readVariable x = do
+  varEnv <- ask
+  (locEnv, _) <- get
+  let addr = M.lookup x varEnv
+  case addr of
+    Nothing -> errorMessage ("No location found for variable " ++ (show x))
+    Just loc -> do
+      let maybeVal = M.lookup loc locEnv
+      case maybeVal of
+        Nothing -> errorMessage (unwords ["Incorrect value for address", show loc, "and variable", show x])
+        Just val -> pure val
 
 transIdent :: Arabica.Abs.Ident -> InterpretingMonadIO ()
 transIdent x = case x of
@@ -43,75 +82,90 @@ transTopDef x = case x of
     -- Na razie tylko uruchamiaj main
     let Arabica.Abs.Ident str = ident
     if str /= "main" then pure ()
-    else transBlock block
+    else do
+      transBlock block
+      pure ()
 
 transArg :: Arabica.Abs.Arg -> InterpretingMonadIO ()
 transArg x = case x of
   Arabica.Abs.Arg type_ ident -> failure x
 
-transBlock :: Arabica.Abs.Block -> InterpretingMonadIO ()
+noPass :: InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
+noPass = do
+  varEnv <- ask
+  pure $ (varEnv, Nothing)
+
+transBlock :: Arabica.Abs.Block -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
 transBlock x = case x of
   Arabica.Abs.Block stmts -> runStmts stmts
   where
-    runStmts [] = pure ()
+    runStmts [] = noPass
     runStmts (stmt:stmts) = do
-      env <- get
-      transStmt stmt
-      runStmts stmts
+      env <- ask
+      (locEnv, _) <- get
+      debugMessage $ unwords ["VARS", show env]
+      debugMessage $ unwords ["LOCS", show locEnv]
+      (newVarEnv, _) <- transStmt stmt
+      local (const newVarEnv) $ runStmts stmts
 
-transStmt :: Arabica.Abs.Stmt -> InterpretingMonadIO ()
+transStmt :: Arabica.Abs.Stmt -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
 transStmt x = case x of
-  Arabica.Abs.Empty -> pure ()
+  Arabica.Abs.Empty -> noPass
   Arabica.Abs.BStmt block -> transBlock block
   Arabica.Abs.Decl type_ items -> do
     -- Na razie tylko int
-    mapM_ transItem items
+    case items of
+      [] -> noPass
+      (x:xs) -> do
+        debugMessage $ unwords ["DECL", show (x:xs)]
+        (newVarEnv, _) <- transItem x
+        local (const newVarEnv) $ transStmt (Arabica.Abs.Decl type_ xs)
   Arabica.Abs.Ass ident expr -> do
-    env <- get
-    let locVal = runReaderT (transExpr expr) env
-    case locVal of
-      Nothing -> errorInterpretingMonadIO
-      Just x -> put $ (M.insert ident x env)
-  Arabica.Abs.ArrAss ident expr1 expr2 -> failure x
-  Arabica.Abs.Incr ident -> failure x
-  Arabica.Abs.Decr ident -> failure x
-  Arabica.Abs.Ret expr -> failure x
-  Arabica.Abs.VRet -> failure x
-  Arabica.Abs.Cond expr stmt -> failure x
-  Arabica.Abs.CondElse expr stmt1 stmt2 -> failure x
+    -- env <- get
+    -- let locVal = runReaderT (transExpr expr) env
+    -- case locVal of
+    --   Nothing -> errorInterpretingMonadIO
+    --   Just x -> updateVariable ident x
+    val <- transExpr expr
+    updateVariable ident val
+    noPass
+  Arabica.Abs.ArrAss ident expr1 expr2 -> errorMessage "ArrAss"
+  Arabica.Abs.Incr ident -> errorMessage "Incr"
+  Arabica.Abs.Decr ident -> errorMessage "Decr"
+  Arabica.Abs.Ret expr -> errorMessage "Ret"
+  Arabica.Abs.VRet -> errorMessage "VRet"
+  Arabica.Abs.Cond expr stmt -> errorMessage "Cond"
+  Arabica.Abs.CondElse expr stmt1 stmt2 -> errorMessage "CondElse"
   Arabica.Abs.While expr stmt -> do
-    env <- get
-    let locVal = runReaderT (transExpr expr) env
-    case locVal of
-      Just (Arabica.Abs.BoolVal y) -> do
-        if y then do
+    val <- transExpr expr
+    case val of
+      Arabica.Abs.BoolVal b -> do
+        if b then do
           transStmt stmt
           transStmt x
         else
-          pure ()
-      _ -> errorInterpretingMonadIO
-  Arabica.Abs.Break -> failure x
-  Arabica.Abs.Continue -> failure x
-  Arabica.Abs.SExp expr -> failure x
-  Arabica.Abs.ForTo item expr stmt -> failure x
+          noPass
+      _ -> errorMessage "while"
+  Arabica.Abs.Break -> errorMessage "Break"
+  Arabica.Abs.Continue -> errorMessage "Continue"
+  Arabica.Abs.SExp expr -> errorMessage "SExp"
+  Arabica.Abs.ForTo item expr stmt -> errorMessage "ForTo"
   Arabica.Abs.Print expr -> do
     -- Na razie tylko inty
-    env <- get
-    let locVal = runReaderT (transExpr expr) env
-    case locVal of
-      Just (Arabica.Abs.IntegerVal x) -> lift $ lift $ putStrLn $ show x
-      _ -> errorInterpretingMonadIO
+    val <- transExpr expr
+    case val of
+      Arabica.Abs.IntegerVal n -> lift $ lift $ lift $ putStrLn $ show n
+      _ -> errorMessage "print"
+    noPass
 
-transItem :: Arabica.Abs.Item -> InterpretingMonadIO ()
+transItem :: Arabica.Abs.Item -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
 transItem x = case x of
-  Arabica.Abs.NoInit ident -> failure x
+  Arabica.Abs.NoInit ident -> errorMessage "NoInit"
   Arabica.Abs.Init ident expr -> do
-    -- Na razie tylko inty
-    env <- get
-    let locVal = runReaderT (transExpr expr) env
-    case locVal of
-      Just x -> put $ (M.insert ident x env)
-      _ -> errorInterpretingMonadIO
+    val <- transExpr expr
+    newVarEnv <- newVariable ident val
+    debugMessage "INIT"
+    pure $ (newVarEnv, Nothing)
 
 transType :: Arabica.Abs.Type -> InterpretingMonadIO ()
 transType x = case x of
@@ -122,21 +176,16 @@ transType x = case x of
   Arabica.Abs.Fun type_ types -> failure x
   Arabica.Abs.Array type_ -> failure x
 
-transExpr :: Arabica.Abs.Expr -> Result
+transExpr :: Arabica.Abs.Expr -> InterpretingMonadIO Arabica.Abs.LocVal
 transExpr x = case x of
-  Arabica.Abs.EArray type_ integer -> errorExpM
-  Arabica.Abs.EArrElem ident expr -> errorExpM
-  Arabica.Abs.ELambda type_ args block -> errorExpM
-  Arabica.Abs.EVar ident -> do
-    env <- ask
-    let val = M.lookup ident env
-    case val of
-      Just y -> pure y
-      Nothing -> errorExpM
+  Arabica.Abs.EArray type_ integer -> errorMessage "Array"
+  Arabica.Abs.EArrElem ident expr -> errorMessage "ArrElem"
+  Arabica.Abs.ELambda type_ args block -> errorMessage "Lambda"
+  Arabica.Abs.EVar ident -> readVariable ident
   Arabica.Abs.ELitInt integer -> pure $ Arabica.Abs.IntegerVal $ integer
   Arabica.Abs.ELitTrue -> pure $ Arabica.Abs.BoolVal $ True
   Arabica.Abs.ELitFalse -> pure $ Arabica.Abs.BoolVal $ False
-  Arabica.Abs.EApp ident exprs -> errorExpM
+  Arabica.Abs.EApp ident exprs -> errorMessage "App"
   Arabica.Abs.EString string -> pure $ Arabica.Abs.StringVal $ string
   Arabica.Abs.Neg expr -> do
     Arabica.Abs.IntegerVal n <- transExpr expr
@@ -175,7 +224,7 @@ transMulOp x n1 n2 = case x of
   Arabica.Abs.Times -> pure $ Arabica.Abs.IntegerVal $ n1 * n2
   Arabica.Abs.Div -> do
     if n2 == 0 then
-      errorExpM
+      errorMessage "Division by 0"
     else
       pure $ Arabica.Abs.IntegerVal $ n1 `div` n2
 

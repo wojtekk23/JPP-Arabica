@@ -23,8 +23,10 @@ import Arabica.Par   ( pProgram, myLexer )
 import Arabica.Print ( Print, printTree )
 import Arabica.Skel  ( transProgram )
 import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Except
 import qualified Data.Map as M
 import Control.Monad.State
+import Control.Monad.Reader
 
 type Err        = Either String
 type ParseFun a = [Token] -> Err a
@@ -64,10 +66,10 @@ runProgram v p s =
     Right tree -> do
       putStrLn "\nParse Successful!"
       -- showTree v tree
-      expEnv <- runMaybeT $ execStateT (transProgram tree) M.empty
+      expEnv <- runExceptT $ execStateT (runReaderT (transProgram tree) M.empty) (M.empty, 0)
       case expEnv of
-        Nothing -> putStrLn "ERROR"
-        Just newEnv -> putStrLn $ show newEnv
+        Left e -> putStrLn e
+        Right newEnv -> putStrLn $ show newEnv
       exitSuccess
   where
   ts = myLexer s
@@ -93,6 +95,7 @@ main = do
   args <- getArgs
   case args of
     ["--help"] -> usage
+    ["--tree"] -> getContents >>= run 2 pProgram
     []         -> getContents >>= runProgram 2 pProgram
     "-s":fs    -> mapM_ (runFile 0 pProgram) fs
     fs         -> mapM_ (runFile 2 pProgram) fs
