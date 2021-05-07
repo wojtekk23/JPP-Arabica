@@ -22,6 +22,10 @@ type InterpretingMonadIO = ReaderT VarEnv (StateT LocMemory (ExceptT String IO))
 type Err = Either String
 type Result = InterpretingMonadIO Arabica.Abs.LocVal
 
+if' :: Bool -> a -> a -> a
+if' True  x _ = x
+if' False _ y = y
+
 errorExpM :: InterpretingMonadIO a
 errorExpM = errorInterpretingMonadIO
 
@@ -146,13 +150,17 @@ transStmt x = case x of
   Arabica.Abs.Ret expr -> do
     retVal <- transExpr expr
     varEnv <- ask
-    debugMessage $ unwords ["ZWRACAMY", show retVal]
     pure $ (varEnv, Just retVal)
   Arabica.Abs.VRet -> do
     varEnv <- ask
     pure $ (varEnv, Just Arabica.Abs.VoidVal)
-  Arabica.Abs.Cond expr stmt -> errorMessage "Cond"
-  Arabica.Abs.CondElse expr stmt1 stmt2 -> errorMessage "CondElse"
+  Arabica.Abs.Cond expr stmt -> transStmt (Arabica.Abs.CondElse expr stmt Arabica.Abs.Empty)
+  Arabica.Abs.CondElse expr stmt1 stmt2 -> do
+    val <- transExpr expr
+    -- Akceptujemy tylko inty i boole
+    case val of
+      Arabica.Abs.BoolVal b -> transStmt $ if' b stmt1 stmt2
+      Arabica.Abs.IntegerVal n -> transStmt $ if' (n /= 0) stmt1 stmt2
   Arabica.Abs.While expr stmt -> do
     val <- transExpr expr
     case val of
@@ -218,7 +226,6 @@ transExpr x = case x of
       Arabica.Abs.FunVal type_ args block -> do
         funVarEnv <- assignArgsToVals exprs args varEnv
         (_, retVal) <- local (const funVarEnv) $ transBlock block
-        debugMessage $ unwords ["FUNKCJA", show ident, "zwraca", show retVal]
         case retVal of
           Just x -> pure x
           Nothing -> errorMessage "NIE MAMY WSPARCIA DLA PROCEDUR???"

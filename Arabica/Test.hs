@@ -6,7 +6,7 @@ import Prelude
   ( ($)
   , Either(..)
   , Int, (>)
-  , String, (++), unlines
+  , String, (++), unlines, unwords
   , Show, show
   , IO, (>>), (>>=), mapM_, putStrLn
   , FilePath
@@ -69,7 +69,7 @@ runProgram v p s =
       expEnv <- runExceptT $ execStateT (runReaderT (transProgram tree) M.empty) (M.empty, 0)
       case expEnv of
         Left e -> putStrLn e
-        Right newEnv -> putStrLn $ show newEnv
+        Right newEnv -> putStrLn $ unwords ["Środowisko", show newEnv]
       exitSuccess
   where
   ts = myLexer s
