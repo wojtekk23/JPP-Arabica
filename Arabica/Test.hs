@@ -17,7 +17,7 @@ import System.Environment ( getArgs )
 import System.Exit        ( exitFailure, exitSuccess )
 import Control.Monad      ( when )
 
-import Arabica.Abs   ( Program )
+import Arabica.Abs 
 import Arabica.Lex   ( Token )
 import Arabica.Par   ( pProgram, myLexer )
 import Arabica.Print ( Print, printTree )
@@ -54,6 +54,22 @@ run v p s =
   where
   ts = myLexer s
 
+getExceptionMessage :: Arabica.Abs.Exception -> String
+getExceptionMessage exception = 
+  case exception of
+    Arabica.Abs.NoLocation ident -> unwords ["No location for variable", show ident]
+    Arabica.Abs.IncorrectValue ident integer -> unwords ["Incorrect value for address", show integer, "and variable", show ident]
+    Arabica.Abs.IndexOutOfBounds n (lower, upper) ident -> unwords ["Position", show n, "out of bounds", show (lower, upper), "for array", show ident]
+    Arabica.Abs.ArrayAssignMismatch ident -> unwords ["Types of array", show ident, "and assigned expression do not match"]
+    Arabica.Abs.IndexNotInteger ident -> unwords ["Array", show ident, "should be indexed with an integer"]
+    Arabica.Abs.NotAnArray ident -> unwords ["Variable", show ident, "cannot be indexed because it is not an array"]
+    Arabica.Abs.TooManyArgs ident -> unwords ["Too many values passed to a function", show ident]
+    Arabica.Abs.NotEnoughArgs ident -> unwords ["Not enough values passed to a function", show ident]
+    Arabica.Abs.NoValueReturned ident type_ -> unwords ["Function", show ident, "should return", show type_, "but returns nothing"]
+    Arabica.Abs.NotAFunction ident -> unwords ["Identifier", show ident, "is not a function"]
+    Arabica.Abs.DivisionByZero -> "Division by 0"
+    Arabica.Abs.StringError s -> s
+
 runProgram :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
 runProgram v p s =
   case p ts of
@@ -68,7 +84,7 @@ runProgram v p s =
       -- showTree v tree
       expEnv <- runExceptT $ execStateT (runReaderT (transProgram tree) M.empty) (M.empty, 0)
       case expEnv of
-        Left e -> putStrLn e
+        Left e -> putStrLn $ getExceptionMessage e
         Right newEnv -> putStrLn $ unwords ["Środowisko", show newEnv]
       exitSuccess
   where

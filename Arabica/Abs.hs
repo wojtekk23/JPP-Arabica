@@ -86,5 +86,20 @@ data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal | F
 
 type Location = Integer
 
+data Exception 
+    = StringError String
+    | DivisionByZero
+    | NoLocation Ident
+    | IncorrectValue Ident Integer
+    | IndexOutOfBounds Integer (Integer, Integer) Ident
+    | ArrayAssignMismatch Ident
+    | IndexNotInteger Ident
+    | NotAnArray Ident
+    | TooManyArgs Ident
+    | NotEnoughArgs Ident
+    | NoValueReturned Ident Type
+    | NotAFunction Ident
+  deriving (C.Eq, C.Show)
+
 type ReturnVal = Maybe LocVal
 
