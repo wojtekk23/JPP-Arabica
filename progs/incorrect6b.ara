@@ -1,0 +1,7 @@
+// Tablice - Próba indeksowania nietablicy
+
+int main() {
+    int x = 42;
+    x[4] = 3;
+    return 0;
+}

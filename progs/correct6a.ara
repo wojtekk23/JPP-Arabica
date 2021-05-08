@@ -1,0 +1,21 @@
+// Tablice - przykładowe poprawne użycie Tablice
+// Pozycja 0 = 0
+// Pozycja i = 42-i
+
+int main() {
+    Array<int> intArray = new int[42];
+
+    int i = 41;
+    while (i > 0) {
+        intArray[i] = 42-i;
+        i = i-1;
+    }
+
+    i = 0;
+    while (i < 42) {
+        print(intArray[i])
+        i = i+1;
+    }
+
+    return 0;
+}

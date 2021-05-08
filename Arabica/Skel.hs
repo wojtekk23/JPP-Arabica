@@ -7,6 +7,7 @@ module Arabica.Skel where
 -- import Prelude (($), Either(..), String, (++), Show, show)
 import qualified Arabica.Abs
 import qualified Data.Map as M
+import Data.Array
 import Control.Monad.State
 import Control.Monad.Reader
 
@@ -118,10 +119,22 @@ transBlock x = case x of
       -- (locEnv, _) <- get
       -- debugMessage $ unwords ["VARS", show env]
       -- debugMessage $ unwords ["LOCS", show locEnv]
+      -- debugMessage $ unwords ["STATEMENT", show stmt]
       (newVarEnv, retVal) <- transStmt stmt
       case retVal of
         Just x -> pure $ (newVarEnv, retVal)
         Nothing -> local (const newVarEnv) $ runStmts stmts
+
+conformValType :: Arabica.Abs.LocVal -> Arabica.Abs.Type -> Bool
+conformValType (Arabica.Abs.IntegerVal _) Arabica.Abs.Int = True
+conformValType (Arabica.Abs.BoolVal _) Arabica.Abs.Bool = True
+conformValType (Arabica.Abs.StringVal _) Arabica.Abs.Str = True
+conformValType Arabica.Abs.VoidVal Arabica.Abs.Void = True
+conformValType (Arabica.Abs.FunVal valType args _) (Arabica.Abs.Fun funType argTypes) = 
+  let leftTypes = map (\(Arabica.Abs.Arg type_ _) -> type_) args in 
+    (valType == funType) && (all (uncurry $ (==)) (zip leftTypes argTypes))
+conformValType (Arabica.Abs.ArrVal arrType _) (Arabica.Abs.Array type_) = arrType == type_
+conformValType _ _ = False
 
 transStmt :: Arabica.Abs.Stmt -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
 transStmt x = case x of
@@ -144,7 +157,24 @@ transStmt x = case x of
     val <- transExpr expr
     updateVariable ident val
     noPass
-  Arabica.Abs.ArrAss ident expr1 expr2 -> errorMessage "ArrAss"
+  Arabica.Abs.ArrAss ident posExpr valExpr -> do
+    arrVal <- readVariable ident
+    case arrVal of
+      Arabica.Abs.ArrVal type_ arr -> do
+        let (lowerBound, upperBound) = bounds arr
+        position <- transExpr posExpr
+        case position of
+          Arabica.Abs.IntegerVal pos -> do
+            if pos < lowerBound || pos > upperBound then do
+              errorMessage $ unwords ["Position", show pos, "out of bounds", show (lowerBound, upperBound), "for array", show ident]
+            else do
+              val <- transExpr valExpr
+              if conformValType val type_ then do
+                updateVariable ident $ Arabica.Abs.ArrVal type_ $ arr // [(pos, val)]
+                noPass
+              else errorMessage $ unwords ["Types of array", show ident, "and assigned expression do not match"]
+          _ -> errorMessage $ unwords ["Array", show ident, "should be indexed with an integer"]
+      _ -> errorMessage $ unwords ["Variable", show ident, "cannot be indexed because it is not an array"]
   Arabica.Abs.Incr ident -> errorMessage "Incr"
   Arabica.Abs.Decr ident -> errorMessage "Decr"
   Arabica.Abs.Ret expr -> do
@@ -166,6 +196,12 @@ transStmt x = case x of
     case val of
       Arabica.Abs.BoolVal b -> do
         if b then do
+          transStmt stmt
+          transStmt x
+        else
+          noPass
+      Arabica.Abs.IntegerVal n -> do
+        if n /= 0 then do
           transStmt stmt
           transStmt x
         else
@@ -214,10 +250,32 @@ assignArgsToVals (e:es) ((Arabica.Abs.Arg type_ ident):as) _ = do
   newVarEnv <- newVariable ident val
   assignArgsToVals es as newVarEnv
 
+defaultVal :: Arabica.Abs.Type -> InterpretingMonadIO Arabica.Abs.LocVal
+defaultVal type_ = case type_ of
+  Arabica.Abs.Int -> pure $ Arabica.Abs.IntegerVal 0
+  Arabica.Abs.Str -> pure $ Arabica.Abs.StringVal ""
+  Arabica.Abs.Bool -> pure $ Arabica.Abs.BoolVal False
+  Arabica.Abs.Array arrType -> pure $ Arabica.Abs.ArrVal arrType (array (0,0) [])
+  _ -> errorMessage "Na razie domyślne wartości mają inty, stringi, boole i tablice"
+
 transExpr :: Arabica.Abs.Expr -> InterpretingMonadIO Arabica.Abs.LocVal
 transExpr x = case x of
-  Arabica.Abs.EArray type_ integer -> errorMessage "Array"
-  Arabica.Abs.EArrElem ident expr -> errorMessage "ArrElem"
+  Arabica.Abs.EArray type_ integer -> do
+    initVal <- defaultVal type_
+    pure $ Arabica.Abs.ArrVal type_ (array (0, integer-1) [(ix, initVal) | ix <- [0..integer-1]])
+  Arabica.Abs.EArrElem ident expr -> do
+    val <- readVariable ident
+    pos <- transExpr expr
+    case val of
+      Arabica.Abs.ArrVal type_ arr -> do
+        let (lowerBound, upperBound) = bounds arr
+        case pos of
+          Arabica.Abs.IntegerVal n -> do
+            if n < lowerBound || n > upperBound then do
+              errorMessage $ unwords ["Position", show pos, "out of bounds", show (lowerBound, upperBound), "for array", show ident]
+            else do
+              pure $ arr ! n
+      _ -> errorMessage $ unwords ["Variable", show ident, "is not an array"]
   Arabica.Abs.ELambda type_ args block -> errorMessage "Lambda"
   Arabica.Abs.EVar ident -> readVariable ident
   Arabica.Abs.ELitInt integer -> pure $ Arabica.Abs.IntegerVal $ integer
@@ -228,6 +286,8 @@ transExpr x = case x of
     maybeFun <- readVariable ident
     case maybeFun of
       Arabica.Abs.FunVal type_ args block -> do
+        -- TODO: przyzwala na pozyskiwanie zmiennych z środowiska funkcji wywołującej, trzeba to zmienić
+        -- i dodać rozróżnienie na funkcje i lambdy (ewentulanie dodać do FunVal środowisko)
         funVarEnv <- assignArgsToVals exprs args varEnv
         (_, retVal) <- local (const funVarEnv) $ transBlock block
         case retVal of
