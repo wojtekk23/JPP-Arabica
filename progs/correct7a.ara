@@ -1,0 +1,14 @@
+// Podstawowy break
+
+int main() {
+    int x = 0;
+    while (x > -1) {
+        x = x + 1;
+
+        if (x == 10) {
+            break;
+        } else {
+            print(x);
+        }
+    }
+}

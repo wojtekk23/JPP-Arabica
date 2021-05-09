@@ -23,6 +23,8 @@ type InterpretingMonadIO = ReaderT VarEnv (StateT LocMemory (ExceptT Arabica.Abs
 type Err = Either String
 type Result = InterpretingMonadIO Arabica.Abs.LocVal
 
+type StmtState = (VarEnv, Arabica.Abs.ReturnVal, Arabica.Abs.LoopState)
+
 if' :: Bool -> a -> a -> a
 if' True  x _ = x
 if' False _ y = y
@@ -96,21 +98,21 @@ transTopDef x = case x of
     let Arabica.Abs.Ident str = ident
     newVarEnv <- newVariable ident (Arabica.Abs.FunVal type_ args block)
     if str == "main" then  do
-      newestReturn <- local (const newVarEnv) $ transBlock block
-      pure $ newestReturn
+      (newestEnv, newestReturn, _) <- local (const newVarEnv) $ transBlock False block
+      pure $ (newestEnv, newestReturn)
     else pure $ (newVarEnv, Nothing)
 
 transArg :: Arabica.Abs.Arg -> InterpretingMonadIO ()
 transArg x = case x of
   Arabica.Abs.Arg type_ ident -> failure x
 
-noPass :: InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
+noPass :: InterpretingMonadIO StmtState
 noPass = do
   varEnv <- ask
-  pure $ (varEnv, Nothing)
+  pure $ (varEnv, Nothing, Arabica.Abs.NoLoopState)
 
-transBlock :: Arabica.Abs.Block -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
-transBlock x = case x of
+transBlock :: Bool -> Arabica.Abs.Block -> InterpretingMonadIO StmtState
+transBlock inLoop x = case x of
   Arabica.Abs.Block stmts -> runStmts stmts
   where
     runStmts [] = noPass
@@ -120,10 +122,15 @@ transBlock x = case x of
       -- debugMessage $ unwords ["VARS", show env]
       -- debugMessage $ unwords ["LOCS", show locEnv]
       -- debugMessage $ unwords ["STATEMENT", show stmt]
-      (newVarEnv, retVal) <- transStmt stmt
+      (newVarEnv, retVal, loopState) <- transStmt inLoop stmt
       case retVal of
-        Just x -> pure $ (newVarEnv, retVal)
-        Nothing -> local (const newVarEnv) $ runStmts stmts
+        Just x -> pure $ (newVarEnv, retVal, loopState)
+        Nothing -> do
+          if inLoop then do
+            case loopState of
+              Arabica.Abs.NoLoopState -> local (const newVarEnv) $ runStmts stmts
+              _ -> pure $ (newVarEnv, retVal, loopState)
+          else local (const newVarEnv) $ runStmts stmts
 
 conformValType :: Arabica.Abs.LocVal -> Arabica.Abs.Type -> Bool
 conformValType (Arabica.Abs.IntegerVal _) Arabica.Abs.Int = True
@@ -136,18 +143,19 @@ conformValType (Arabica.Abs.FunVal valType args _) (Arabica.Abs.Fun funType argT
 conformValType (Arabica.Abs.ArrVal arrType _) (Arabica.Abs.Array type_) = arrType == type_
 conformValType _ _ = False
 
-transStmt :: Arabica.Abs.Stmt -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
-transStmt x = case x of
+-- Bool - czy jesteśmy w pętli
+transStmt :: Bool -> Arabica.Abs.Stmt -> InterpretingMonadIO StmtState
+transStmt inLoop x = case x of
   Arabica.Abs.Empty -> noPass
-  Arabica.Abs.BStmt block -> transBlock block
+  Arabica.Abs.BStmt block -> transBlock inLoop block
   Arabica.Abs.Decl type_ items -> do
     -- Na razie tylko int
     case items of
       [] -> noPass
       (x:xs) -> do
         -- debugMessage $ unwords ["DECL", show (x:xs)]
-        (newVarEnv, _) <- transItem x
-        local (const newVarEnv) $ transStmt (Arabica.Abs.Decl type_ xs)
+        newVarEnv <- transItem x
+        local (const newVarEnv) $ transStmt inLoop (Arabica.Abs.Decl type_ xs)
   Arabica.Abs.Ass ident expr -> do
     -- env <- get
     -- let locVal = runReaderT (transExpr expr) env
@@ -180,35 +188,45 @@ transStmt x = case x of
   Arabica.Abs.Ret expr -> do
     retVal <- transExpr expr
     varEnv <- ask
-    pure $ (varEnv, Just retVal)
+    pure $ (varEnv, Just retVal, Arabica.Abs.NoLoopState)
   Arabica.Abs.VRet -> do
     varEnv <- ask
-    pure $ (varEnv, Just Arabica.Abs.VoidVal)
-  Arabica.Abs.Cond expr stmt -> transStmt (Arabica.Abs.CondElse expr stmt Arabica.Abs.Empty)
+    pure $ (varEnv, Just Arabica.Abs.VoidVal, Arabica.Abs.NoLoopState)
+  Arabica.Abs.Cond expr stmt -> transStmt inLoop $ Arabica.Abs.CondElse expr stmt Arabica.Abs.Empty
   Arabica.Abs.CondElse expr stmt1 stmt2 -> do
     val <- transExpr expr
     -- Akceptujemy tylko inty i boole
     case val of
-      Arabica.Abs.BoolVal b -> transStmt $ if' b stmt1 stmt2
-      Arabica.Abs.IntegerVal n -> transStmt $ if' (n /= 0) stmt1 stmt2
+      Arabica.Abs.BoolVal b -> transStmt inLoop $ if' b stmt1 stmt2
+      Arabica.Abs.IntegerVal n -> transStmt inLoop $ if' (n /= 0) stmt1 stmt2
   Arabica.Abs.While expr stmt -> do
     val <- transExpr expr
+    -- TODO: Napisz to bez powtórzeń
     case val of
       Arabica.Abs.BoolVal b -> do
         if b then do
-          transStmt stmt
-          transStmt x
+          (_, _, loopState) <- transStmt True stmt
+          case loopState of
+            Arabica.Abs.BreakState -> noPass
+            -- TODO: Czy tutaj inLoop czy może True? A może False xdd
+            _ -> transStmt inLoop x
         else
           noPass
       Arabica.Abs.IntegerVal n -> do
         if n /= 0 then do
-          transStmt stmt
-          transStmt x
+          (_, _, loopState) <- transStmt True stmt
+          case loopState of
+            Arabica.Abs.BreakState -> noPass
+            _ -> transStmt inLoop x
         else
           noPass
       _ -> failure "while"
-  Arabica.Abs.Break -> failure "Break"
-  Arabica.Abs.Continue -> failure "Continue"
+  Arabica.Abs.Break -> do
+    varEnv <- ask
+    pure $ (varEnv, Nothing, Arabica.Abs.BreakState)
+  Arabica.Abs.Continue -> do
+    varEnv <- ask
+    pure $ (varEnv, Nothing, Arabica.Abs.ContState)
   Arabica.Abs.SExp expr -> do
     transExpr expr
     noPass
@@ -223,14 +241,14 @@ transStmt x = case x of
       _ -> failure "Can only print integers, booleans and strings"
     noPass
 
-transItem :: Arabica.Abs.Item -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
+transItem :: Arabica.Abs.Item -> InterpretingMonadIO VarEnv
 transItem x = case x of
   Arabica.Abs.NoInit ident -> failure "NoInit"
   Arabica.Abs.Init ident expr -> do
     val <- transExpr expr
     newVarEnv <- newVariable ident val
     -- debugMessage "INIT"
-    pure $ (newVarEnv, Nothing)
+    pure $ newVarEnv
 
 transType :: Arabica.Abs.Type -> InterpretingMonadIO ()
 transType x = case x of
@@ -289,7 +307,7 @@ transExpr x = case x of
         -- TODO: przyzwala na pozyskiwanie zmiennych z środowiska funkcji wywołującej, trzeba to zmienić
         -- i dodać rozróżnienie na funkcje i lambdy (ewentulanie dodać do FunVal środowisko)
         funVarEnv <- assignArgsToVals ident exprs args varEnv
-        (_, retVal) <- local (const funVarEnv) $ transBlock block
+        (_, retVal, _) <- local (const funVarEnv) $ transBlock False block
         case retVal of
           Just x -> pure x
           Nothing -> do

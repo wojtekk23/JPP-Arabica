@@ -103,3 +103,6 @@ data Exception
 
 type ReturnVal = Maybe LocVal
 
+data LoopState = BreakState | ContState | NoLoopState
+  deriving (C.Show, C.Eq)
+

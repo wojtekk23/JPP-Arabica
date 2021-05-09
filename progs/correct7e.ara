@@ -1,0 +1,16 @@
+// Break - instrukcja break wywołana ze środka funkcji (procedury) nie kończy pętli
+
+void f() {
+    break;
+}
+
+int main () {
+    int x = 0;
+
+    while (x < 5) {
+        f();
+        x = x+1;
+        print(x);
+    }
+}
+

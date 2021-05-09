@@ -7,7 +7,7 @@ int main() {
     int x = 42;
     
     while (y) {
-        print ("World!");
+        print("World!");
         x--;
         
         if (x == 0)
