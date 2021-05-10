@@ -7,9 +7,10 @@
 
 module Arabica.Abs where
 
-import Prelude (Integer, String)
+import Prelude (Integer, String, Bool, Maybe)
 import qualified Prelude as C (Eq, Ord, Show, Read)
 import qualified Data.String
+import Data.Array
 
 data Program = Program [TopDef]
   deriving (C.Eq, C.Ord, C.Show, C.Read)
@@ -28,6 +29,7 @@ data Stmt
     | BStmt Block
     | Decl Type [Item]
     | Ass Ident Expr
+    | ArrAss Ident Expr Expr
     | Incr Ident
     | Decr Ident
     | Ret Expr
@@ -78,4 +80,30 @@ data RelOp = LTH | LE | GTH | GE | EQU | NE
 
 newtype Ident = Ident String
   deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
+
+data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal | FunVal Type [Arg] Block | ArrVal Type (Array Integer LocVal)
+  deriving (C.Show)
+
+type Location = Integer
+
+data Exception 
+    = StringError String
+    | DivisionByZero
+    | NoLocation Ident
+    | IncorrectValue Ident Integer
+    | IndexOutOfBounds Integer (Integer, Integer) Ident
+    | ArrayAssignMismatch Ident
+    | IndexNotInteger Ident
+    | NotAnArray Ident
+    | TooManyArgs Ident
+    | NotEnoughArgs Ident
+    | NoValueReturned Ident Type
+    | NotAFunction Ident
+    | ReadOnlyVariable Ident
+  deriving (C.Eq, C.Show)
+
+type ReturnVal = Maybe LocVal
+
+data LoopState = BreakState | ContState | NoLoopState
+  deriving (C.Show, C.Eq)
 

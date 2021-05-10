@@ -54,7 +54,7 @@ Continue.  Stmt ::= "continue" ";" ;
 
 SExp.      Stmt ::= Expr  ";" ;
 
-ForTo.	   Stmt ::= "for" Item "to" Expr "do" Stmt ;
+ForTo.	   Stmt ::= "for" Ident "=" Expr "to" Expr "do" Stmt ;
 
 Print.     Stmt ::= "print(" Expr ")" ;
 

@@ -1,0 +1,31 @@
+// ForTo - pętla oblicza granice pętli jeden raz, testowanie continue i break;
+// Powinno wypisać liczby nieparzyste od 0 do 10
+
+int f1() {
+    print("OBLICZENIE WYRAZENIA 1");
+    return 0;
+}
+
+int f2() {
+    print("OBLICZENIE WYRAZENIA 2");
+    return 20;
+}
+
+int main() {
+    int even = 0;
+
+    for i = f1() to f2() do {
+        if (i == even) {
+            even = even + 2;
+            continue;
+        }
+
+        if (i == 11) {
+            break;
+        }
+
+        print(i);
+    }
+
+    return 0;
+}

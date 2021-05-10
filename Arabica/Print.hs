@@ -157,7 +157,7 @@ instance Print Arabica.Abs.Stmt where
     Arabica.Abs.Break -> prPrec i 0 (concatD [doc (showString "break"), doc (showString ";")])
     Arabica.Abs.Continue -> prPrec i 0 (concatD [doc (showString "continue"), doc (showString ";")])
     Arabica.Abs.SExp expr -> prPrec i 0 (concatD [prt 0 expr, doc (showString ";")])
-    Arabica.Abs.ForTo item expr stmt -> prPrec i 0 (concatD [doc (showString "for"), prt 0 item, doc (showString "to"), prt 0 expr, doc (showString "do"), prt 0 stmt])
+    Arabica.Abs.ForTo id_ expr1 expr2 stmt -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id_, doc (showString "="), prt 0 expr1, doc (showString "to"), prt 0 expr2, doc (showString "do"), prt 0 stmt])
     Arabica.Abs.Print expr -> prPrec i 0 (concatD [doc (showString "print("), prt 0 expr, doc (showString ")")])
   prtList _ [] = concatD []
   prtList _ (x:xs) = concatD [prt 0 x, prt 0 xs]

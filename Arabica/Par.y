@@ -115,7 +115,7 @@ Stmt : ';' { Arabica.Abs.Empty }
      | 'break' ';' { Arabica.Abs.Break }
      | 'continue' ';' { Arabica.Abs.Continue }
      | Expr ';' { Arabica.Abs.SExp $1 }
-     | 'for' Item 'to' Expr 'do' Stmt { Arabica.Abs.ForTo $2 $4 $6 }
+     | 'for' Ident '=' Expr 'to' Expr 'do' Stmt { Arabica.Abs.ForTo $2 $4 $6 $8 }
      | 'print(' Expr ')' { Arabica.Abs.Print $2 }
 
 Item :: { Arabica.Abs.Item }

@@ -39,8 +39,8 @@ The reserved words used in arabica are the following:
 
 The symbols used in arabica are the following:
   | ( | ) | , | {
-  | } | ; | = | ++
-  | -- | print( | [ | ]
+  | } | ; | = | [
+  | ] | ++ | -- | print(
   | < | > | - | !
   | && | || | + | *
   | / | <= | >= | ==
@@ -70,6 +70,7 @@ All other symbols are terminals.
   |  |  **|**  | //Block//
   |  |  **|**  | //Type// //[Item]// ``;``
   |  |  **|**  | //Ident// ``=`` //Expr// ``;``
+  |  |  **|**  | //Ident// ``[`` //Expr6// ``]`` ``=`` //Expr// ``;``
   |  |  **|**  | //Ident// ``++`` ``;``
   |  |  **|**  | //Ident// ``--`` ``;``
   |  |  **|**  | ``return`` //Expr// ``;``

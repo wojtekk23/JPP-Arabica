@@ -14,7 +14,8 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
 
-type VarEnv = M.Map Arabica.Abs.Ident Arabica.Abs.Location
+-- Bool - czy zmienna jest read-only
+type VarEnv = M.Map Arabica.Abs.Ident (Arabica.Abs.Location, Bool)
 type LocEnv = M.Map Arabica.Abs.Location Arabica.Abs.LocVal
 type LocMemory = (LocEnv, Arabica.Abs.Location)
 type ExpM a = ReaderT VarEnv Maybe a
@@ -45,14 +46,15 @@ errorMessage e = lift $ lift $ throwE e
 debugMessage :: String -> InterpretingMonadIO ()
 debugMessage s = lift $ lift $ lift $ putStrLn s
 
-newVariable :: Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO VarEnv
-newVariable x val = do
+-- Is new variable readonly?
+newVariable :: Bool -> Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO VarEnv
+newVariable readOnly x val = do
   -- TODO: Na razie chyba przyzwalamy na powtórzone deklaracje, chyba trzeba będzie zmienić
   varEnv <- ask
   (locEnv, loc) <- get
   -- debugMessage $ unwords [show x, show val]
   put $ (M.insert loc val locEnv, loc+1)
-  pure $ M.insert x loc varEnv
+  pure $ M.insert x (loc, readOnly) varEnv
 
 updateVariable :: Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO ()
 updateVariable x val = do
@@ -61,7 +63,22 @@ updateVariable x val = do
   let addr = M.lookup x varEnv
   case addr of
     Nothing -> errorMessage $ Arabica.Abs.NoLocation x
-    Just loc -> put $ (M.insert loc val locEnv, lastLoc)
+    Just (loc, readOnly) -> do
+      if readOnly then do
+        errorMessage $ Arabica.Abs.ReadOnlyVariable x
+      else do put $ (M.insert loc val locEnv, lastLoc)
+
+updateForVariable :: Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO ()
+updateForVariable x val = do
+  varEnv <- ask
+  (locEnv, lastLoc) <- get
+  let addr = M.lookup x varEnv
+  case addr of
+    Nothing -> errorMessage $ Arabica.Abs.NoLocation x
+    Just (loc, readOnly) -> do
+      if readOnly then do
+        put $ (M.insert loc val locEnv, lastLoc)
+      else do failure "updateForVariable for NOT read-only variable"    
 
 readVariable :: Arabica.Abs.Ident -> InterpretingMonadIO Arabica.Abs.LocVal
 readVariable x = do
@@ -70,7 +87,7 @@ readVariable x = do
   let addr = M.lookup x varEnv
   case addr of
     Nothing -> errorMessage $ Arabica.Abs.NoLocation x
-    Just loc -> do
+    Just (loc, _) -> do
       let maybeVal = M.lookup loc locEnv
       case maybeVal of
         Nothing -> errorMessage $ Arabica.Abs.IncorrectValue x loc
@@ -96,7 +113,7 @@ transTopDef x = case x of
   Arabica.Abs.FnDef type_ ident args block -> do
     -- Na razie tylko uruchamiaj main
     let Arabica.Abs.Ident str = ident
-    newVarEnv <- newVariable ident (Arabica.Abs.FunVal type_ args block)
+    newVarEnv <- newVariable False ident (Arabica.Abs.FunVal type_ args block)
     if str == "main" then  do
       (newestEnv, newestReturn, _) <- local (const newVarEnv) $ transBlock False block
       pure $ (newestEnv, newestReturn)
@@ -154,7 +171,7 @@ transStmt inLoop x = case x of
       [] -> noPass
       (x:xs) -> do
         -- debugMessage $ unwords ["DECL", show (x:xs)]
-        newVarEnv <- transItem x
+        newVarEnv <- transItem False x
         local (const newVarEnv) $ transStmt inLoop (Arabica.Abs.Decl type_ xs)
   Arabica.Abs.Ass ident expr -> do
     -- env <- get
@@ -205,6 +222,7 @@ transStmt inLoop x = case x of
     case val of
       Arabica.Abs.BoolVal b -> do
         if b then do
+          -- TODO: NIE DZIAŁA RETURN W PĘTLACH!!!!
           (_, _, loopState) <- transStmt True stmt
           case loopState of
             Arabica.Abs.BreakState -> noPass
@@ -230,7 +248,28 @@ transStmt inLoop x = case x of
   Arabica.Abs.SExp expr -> do
     transExpr expr
     noPass
-  Arabica.Abs.ForTo item expr stmt -> failure "ForTo"
+  Arabica.Abs.ForTo ident expr1 expr2 stmt -> do
+    -- transItem True item
+    -- val <- transExpr expr
+    -- TODO: NIE DZIAŁA RETURN W PĘTLACH!!!!
+    val1 <- transExpr expr1
+    val2 <- transExpr expr2
+    if (conformValType val1 Arabica.Abs.Int) && (conformValType val2 Arabica.Abs.Int) then do
+      let Arabica.Abs.IntegerVal n1 = val1
+      let Arabica.Abs.IntegerVal n2 = val2
+      newVarEnv <- newVariable True ident val1
+      local (const newVarEnv) $ runForLoop ident n1 n2 stmt
+    else
+      failure "ForTo"
+    where
+      runForLoop ident curr n2 stmt = do
+        if curr == n2 then noPass
+        else do
+          updateForVariable ident $ Arabica.Abs.IntegerVal curr
+          (_, _, loopState) <- transStmt True stmt
+          case loopState of
+            Arabica.Abs.BreakState -> noPass
+            _ -> runForLoop ident (curr+1) n2 stmt
   Arabica.Abs.Print expr -> do
     -- Na razie tylko inty
     val <- transExpr expr
@@ -241,12 +280,13 @@ transStmt inLoop x = case x of
       _ -> failure "Can only print integers, booleans and strings"
     noPass
 
-transItem :: Arabica.Abs.Item -> InterpretingMonadIO VarEnv
-transItem x = case x of
+-- Bool - readonly?
+transItem :: Bool -> Arabica.Abs.Item -> InterpretingMonadIO VarEnv
+transItem readOnly x = case x of
   Arabica.Abs.NoInit ident -> failure "NoInit"
   Arabica.Abs.Init ident expr -> do
     val <- transExpr expr
-    newVarEnv <- newVariable ident val
+    newVarEnv <- newVariable readOnly ident val
     -- debugMessage "INIT"
     pure $ newVarEnv
 
@@ -265,7 +305,7 @@ assignArgsToVals ident _ [] _ = errorMessage $ Arabica.Abs.TooManyArgs ident
 assignArgsToVals ident [] _ _ = errorMessage $ Arabica.Abs.NotEnoughArgs ident
 assignArgsToVals ident (e:es) ((Arabica.Abs.Arg type_ ident_):as) _ = do
   val <- transExpr e
-  newVarEnv <- newVariable ident_ val
+  newVarEnv <- newVariable False ident_ val
   assignArgsToVals ident es as newVarEnv
 
 defaultVal :: Arabica.Abs.Type -> InterpretingMonadIO Arabica.Abs.LocVal

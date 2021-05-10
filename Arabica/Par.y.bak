@@ -104,6 +104,7 @@ Stmt : ';' { Arabica.Abs.Empty }
      | Block { Arabica.Abs.BStmt $1 }
      | Type ListItem ';' { Arabica.Abs.Decl $1 $2 }
      | Ident '=' Expr ';' { Arabica.Abs.Ass $1 $3 }
+     | Ident '[' Expr6 ']' '=' Expr ';' { Arabica.Abs.ArrAss $1 $3 $6 }
      | Ident '++' ';' { Arabica.Abs.Incr $1 }
      | Ident '--' ';' { Arabica.Abs.Decr $1 }
      | 'return' Expr ';' { Arabica.Abs.Ret $2 }

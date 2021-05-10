@@ -40,7 +40,7 @@ data Stmt
     | Break
     | Continue
     | SExp Expr
-    | ForTo Item Expr Stmt
+    | ForTo Ident Expr Expr Stmt
     | Print Expr
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
@@ -99,6 +99,7 @@ data Exception
     | NotEnoughArgs Ident
     | NoValueReturned Ident Type
     | NotAFunction Ident
+    | ReadOnlyVariable Ident
   deriving (C.Eq, C.Show)
 
 type ReturnVal = Maybe LocVal
