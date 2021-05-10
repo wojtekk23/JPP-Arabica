@@ -223,19 +223,26 @@ transStmt inLoop x = case x of
       Arabica.Abs.BoolVal b -> do
         if b then do
           -- TODO: NIE DZIAŁA RETURN W PĘTLACH!!!!
-          (_, _, loopState) <- transStmt True stmt
-          case loopState of
-            Arabica.Abs.BreakState -> noPass
-            -- TODO: Czy tutaj inLoop czy może True? A może False xdd
-            _ -> transStmt inLoop x
+          (newVarEnv, retVal, loopState) <- transStmt True stmt
+          case retVal of
+            Just x -> pure $ (newVarEnv, retVal, loopState)
+            Nothing -> do
+              case loopState of
+                Arabica.Abs.BreakState -> noPass
+                -- TODO: Czy tutaj inLoop czy może True? A może False xdd
+                _ -> transStmt inLoop x
         else
           noPass
       Arabica.Abs.IntegerVal n -> do
         if n /= 0 then do
-          (_, _, loopState) <- transStmt True stmt
-          case loopState of
-            Arabica.Abs.BreakState -> noPass
-            _ -> transStmt inLoop x
+          (newVarEnv, retVal, loopState) <- transStmt True stmt
+          case retVal of
+            Just x -> pure $ (newVarEnv, retVal, loopState)
+            Nothing -> do
+              case loopState of
+                Arabica.Abs.BreakState -> noPass
+                -- TODO: Czy tutaj inLoop czy może True? A może False xdd
+                _ -> transStmt inLoop x
         else
           noPass
       _ -> failure "while"
@@ -266,10 +273,13 @@ transStmt inLoop x = case x of
         if curr == n2 then noPass
         else do
           updateForVariable ident $ Arabica.Abs.IntegerVal curr
-          (_, _, loopState) <- transStmt True stmt
-          case loopState of
-            Arabica.Abs.BreakState -> noPass
-            _ -> runForLoop ident (curr+1) n2 stmt
+          (newVarEnv, retVal, loopState) <- transStmt True stmt
+          case retVal of
+            Just x -> pure $ (newVarEnv, retVal, loopState)
+            Nothing -> do
+              case loopState of
+                Arabica.Abs.BreakState -> noPass
+                _ -> runForLoop ident (curr+1) n2 stmt
   Arabica.Abs.Print expr -> do
     -- Na razie tylko inty
     val <- transExpr expr
