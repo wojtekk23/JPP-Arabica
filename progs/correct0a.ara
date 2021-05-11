@@ -1,0 +1,10 @@
+// Funkcja z wieloma argumentami
+
+int f(int x, int d) {
+    return x + d;
+}
+
+int main() {
+    print(f(3, 5));
+    return 0;
+}

@@ -1,0 +1,21 @@
+// Lambda - testowanie podstawowego capture (powinno kopiować się przez wartość)
+
+int main() {
+    int x = 3;
+    [int]() f = [int]() {
+        x = x+1;
+        return x;
+    };
+
+    print("Wypisz f() = 4");
+    print(f());
+
+    print("f() obliczone drugi raz również = 4");
+    print(f());
+
+    print("Wartosc x = 3");
+    print(x);
+
+    return 0;
+}
+

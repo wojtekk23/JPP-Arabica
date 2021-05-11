@@ -308,14 +308,14 @@ transType x = case x of
   Arabica.Abs.Fun type_ types -> failure x
   Arabica.Abs.Array type_ -> failure x
 
-assignArgsToVals :: Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.Arg] -> Arabica.Abs.VarEnv -> InterpretingMonadIO Arabica.Abs.VarEnv
-assignArgsToVals _ [] [] env = pure env
-assignArgsToVals ident _ [] _ = errorMessage $ Arabica.Abs.TooManyArgs ident
-assignArgsToVals ident [] _ _ = errorMessage $ Arabica.Abs.NotEnoughArgs ident
-assignArgsToVals ident (e:es) ((Arabica.Abs.Arg type_ ident_):as) _ = do
+assignArgsToVals :: Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.Arg] -> InterpretingMonadIO Arabica.Abs.VarEnv
+assignArgsToVals _ [] [] = ask
+assignArgsToVals ident _ [] = errorMessage $ Arabica.Abs.TooManyArgs ident
+assignArgsToVals ident [] _ = errorMessage $ Arabica.Abs.NotEnoughArgs ident
+assignArgsToVals ident (e:es) ((Arabica.Abs.Arg type_ ident_):as) = do
   val <- transExpr e
   newVarEnv <- newVariable False ident_ val
-  assignArgsToVals ident es as newVarEnv
+  local (const newVarEnv) $ assignArgsToVals ident es as
 
 defaultVal :: Arabica.Abs.Type -> InterpretingMonadIO Arabica.Abs.LocVal
 defaultVal type_ = case type_ of
@@ -324,6 +324,22 @@ defaultVal type_ = case type_ of
   Arabica.Abs.Bool -> pure $ Arabica.Abs.BoolVal False
   Arabica.Abs.Array arrType -> pure $ Arabica.Abs.ArrVal arrType (array (0,0) [])
   _ -> failure "Na razie domyślne wartości mają inty, stringi, boole i tablice"
+
+getClosureFromCurrentEnvironment :: Arabica.Abs.VarEnv -> InterpretingMonadIO Arabica.Abs.Closure
+getClosureFromCurrentEnvironment varEnv = do
+  let varKeys = M.keys varEnv
+  varVals <- mapM readVariable varKeys
+  pure $ M.fromList $ zip varKeys varVals
+
+assignClosureToVals :: Arabica.Abs.Closure -> InterpretingMonadIO Arabica.Abs.VarEnv
+assignClosureToVals closure = do
+  let keyValPairs = M.toList closure
+  getUpdatedEnv keyValPairs
+  where
+    getUpdatedEnv [] = ask
+    getUpdatedEnv ((key, val):pairs) = do
+    newVarEnv <- newVariable False key val
+    local (const newVarEnv) $ getUpdatedEnv pairs
 
 transExpr :: Arabica.Abs.Expr -> InterpretingMonadIO Arabica.Abs.LocVal
 transExpr x = case x of
@@ -343,7 +359,11 @@ transExpr x = case x of
             else do
               pure $ arr ! n
       _ -> errorMessage $ Arabica.Abs.NotAnArray ident
-  Arabica.Abs.ELambda type_ args block -> failure "Lambda"
+  Arabica.Abs.ELambda type_ args block -> do
+    varEnv <- ask
+    closure <- getClosureFromCurrentEnvironment varEnv
+    -- debugMessage $ unwords ["create function with args", show args]
+    pure $ Arabica.Abs.FunVal type_ args block closure
   Arabica.Abs.EVar ident -> readVariable ident
   Arabica.Abs.ELitInt integer -> pure $ Arabica.Abs.IntegerVal $ integer
   Arabica.Abs.ELitTrue -> pure $ Arabica.Abs.BoolVal $ True
@@ -356,7 +376,10 @@ transExpr x = case x of
       Arabica.Abs.FunVal type_ args block closure -> do
         -- TODO: przyzwala na pozyskiwanie zmiennych z środowiska funkcji wywołującej, trzeba to zmienić
         -- i dodać rozróżnienie na funkcje i lambdy (ewentulanie dodać do FunVal środowisko)
-        funVarEnv <- assignArgsToVals ident exprs args varEnv
+        oldFunVarEnv <- assignArgsToVals ident exprs args
+        funVarEnv <- local (const oldFunVarEnv) $ assignClosureToVals closure
+        -- let funVarEnv = oldfunVarEnv
+        -- debugMessage $ unwords ["apply function with environment", show funVarEnv]
         (_, retVal, _) <- local (const funVarEnv) $ transBlock False block
         case retVal of
           Just x -> pure x
