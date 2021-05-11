@@ -222,7 +222,6 @@ transStmt inLoop x = case x of
     case val of
       Arabica.Abs.BoolVal b -> do
         if b then do
-          -- TODO: NIE DZIAŁA RETURN W PĘTLACH!!!!
           (newVarEnv, retVal, loopState) <- transStmt True stmt
           case retVal of
             Just x -> pure $ (newVarEnv, retVal, loopState)

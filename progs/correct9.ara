@@ -21,7 +21,7 @@ int g() {
 
 int main() {
     int x = f();
-    int y = f();
+    int y = g();
 
     print("x:");
     print(x);
