@@ -15,16 +15,16 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
 
 -- Bool - czy zmienna jest read-only
-type VarEnv = M.Map Arabica.Abs.Ident (Arabica.Abs.Location, Bool)
-type LocEnv = M.Map Arabica.Abs.Location Arabica.Abs.LocVal
-type LocMemory = (LocEnv, Arabica.Abs.Location)
-type ExpM a = ReaderT VarEnv Maybe a
-type InterpretingMonadIO = ReaderT VarEnv (StateT LocMemory (ExceptT Arabica.Abs.Exception IO))
+-- type VarEnv = M.Map Arabica.Abs.Ident (Arabica.Abs.Location, Bool)
+-- type LocEnv = M.Map Arabica.Abs.Location Arabica.Abs.LocVal
+-- type LocMemory = (LocEnv, Arabica.Abs.Location)
+-- type ExpM a = ReaderT VarEnv Maybe a
+type InterpretingMonadIO = ReaderT Arabica.Abs.VarEnv (StateT Arabica.Abs.LocMemory (ExceptT Arabica.Abs.Exception IO))
 
 type Err = Either String
 type Result = InterpretingMonadIO Arabica.Abs.LocVal
 
-type StmtState = (VarEnv, Arabica.Abs.ReturnVal, Arabica.Abs.LoopState)
+type StmtState = (Arabica.Abs.VarEnv, Arabica.Abs.ReturnVal, Arabica.Abs.LoopState)
 
 if' :: Bool -> a -> a -> a
 if' True  x _ = x
@@ -47,7 +47,7 @@ debugMessage :: String -> InterpretingMonadIO ()
 debugMessage s = lift $ lift $ lift $ putStrLn s
 
 -- Is new variable readonly?
-newVariable :: Bool -> Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO VarEnv
+newVariable :: Bool -> Arabica.Abs.Ident -> Arabica.Abs.LocVal -> InterpretingMonadIO Arabica.Abs.VarEnv
 newVariable readOnly x val = do
   -- TODO: Na razie chyba przyzwalamy na powtórzone deklaracje, chyba trzeba będzie zmienić
   varEnv <- ask
@@ -108,12 +108,12 @@ transProgram x = case x of
       (varEnv, _) <- transTopDef def
       local (const varEnv) $ runTopDefs defs
 
-transTopDef :: Arabica.Abs.TopDef -> InterpretingMonadIO (VarEnv, Arabica.Abs.ReturnVal)
+transTopDef :: Arabica.Abs.TopDef -> InterpretingMonadIO (Arabica.Abs.VarEnv, Arabica.Abs.ReturnVal)
 transTopDef x = case x of
   Arabica.Abs.FnDef type_ ident args block -> do
     -- Na razie tylko uruchamiaj main
     let Arabica.Abs.Ident str = ident
-    newVarEnv <- newVariable False ident (Arabica.Abs.FunVal type_ args block)
+    newVarEnv <- newVariable False ident (Arabica.Abs.FunVal type_ args block M.empty)
     if str == "main" then  do
       (newestEnv, newestReturn, _) <- local (const newVarEnv) $ transBlock False block
       pure $ (newestEnv, newestReturn)
@@ -154,7 +154,7 @@ conformValType (Arabica.Abs.IntegerVal _) Arabica.Abs.Int = True
 conformValType (Arabica.Abs.BoolVal _) Arabica.Abs.Bool = True
 conformValType (Arabica.Abs.StringVal _) Arabica.Abs.Str = True
 conformValType Arabica.Abs.VoidVal Arabica.Abs.Void = True
-conformValType (Arabica.Abs.FunVal valType args _) (Arabica.Abs.Fun funType argTypes) = 
+conformValType (Arabica.Abs.FunVal valType args _ _) (Arabica.Abs.Fun funType argTypes) = 
   let leftTypes = map (\(Arabica.Abs.Arg type_ _) -> type_) args in 
     (valType == funType) && (all (uncurry $ (==)) (zip leftTypes argTypes))
 conformValType (Arabica.Abs.ArrVal arrType _) (Arabica.Abs.Array type_) = arrType == type_
@@ -290,7 +290,7 @@ transStmt inLoop x = case x of
     noPass
 
 -- Bool - readonly?
-transItem :: Bool -> Arabica.Abs.Item -> InterpretingMonadIO VarEnv
+transItem :: Bool -> Arabica.Abs.Item -> InterpretingMonadIO Arabica.Abs.VarEnv
 transItem readOnly x = case x of
   Arabica.Abs.NoInit ident -> failure "NoInit"
   Arabica.Abs.Init ident expr -> do
@@ -308,7 +308,7 @@ transType x = case x of
   Arabica.Abs.Fun type_ types -> failure x
   Arabica.Abs.Array type_ -> failure x
 
-assignArgsToVals :: Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.Arg] -> VarEnv -> InterpretingMonadIO VarEnv
+assignArgsToVals :: Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.Arg] -> Arabica.Abs.VarEnv -> InterpretingMonadIO Arabica.Abs.VarEnv
 assignArgsToVals _ [] [] env = pure env
 assignArgsToVals ident _ [] _ = errorMessage $ Arabica.Abs.TooManyArgs ident
 assignArgsToVals ident [] _ _ = errorMessage $ Arabica.Abs.NotEnoughArgs ident
@@ -352,7 +352,8 @@ transExpr x = case x of
     varEnv <- ask
     maybeFun <- readVariable ident
     case maybeFun of
-      Arabica.Abs.FunVal type_ args block -> do
+      -- TODO: closures
+      Arabica.Abs.FunVal type_ args block closure -> do
         -- TODO: przyzwala na pozyskiwanie zmiennych z środowiska funkcji wywołującej, trzeba to zmienić
         -- i dodać rozróżnienie na funkcje i lambdy (ewentulanie dodać do FunVal środowisko)
         funVarEnv <- assignArgsToVals ident exprs args varEnv

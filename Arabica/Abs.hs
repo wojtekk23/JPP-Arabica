@@ -10,6 +10,11 @@ module Arabica.Abs where
 import Prelude (Integer, String, Bool, Maybe)
 import qualified Prelude as C (Eq, Ord, Show, Read)
 import qualified Data.String
+import qualified Data.Map as M
+import Control.Monad.State
+import Control.Monad.Reader
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Except
 import Data.Array
 
 data Program = Program [TopDef]
@@ -81,7 +86,14 @@ data RelOp = LTH | LE | GTH | GE | EQU | NE
 newtype Ident = Ident String
   deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
 
-data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal | FunVal Type [Arg] Block | ArrVal Type (Array Integer LocVal)
+type VarEnv = M.Map Ident (Location, Bool)
+type LocEnv = M.Map Location LocVal
+type LocMemory = (LocEnv, Location)
+type ExpM a = ReaderT VarEnv Maybe a
+
+type Closure = M.Map Ident LocVal
+
+data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal | FunVal Type [Arg] Block Closure | ArrVal Type (Array Integer LocVal)
   deriving (C.Show)
 
 type Location = Integer
