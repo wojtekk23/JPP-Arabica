@@ -7,7 +7,7 @@
 
 module Arabica.Abs where
 
-import Prelude (Integer, String, Bool, Maybe)
+import Prelude (Integer, String, Bool, Maybe, IO)
 import qualified Prelude as C (Eq, Ord, Show, Read)
 import qualified Data.String
 import qualified Data.Map as M
@@ -115,6 +115,10 @@ data Exception
   deriving (C.Eq, C.Show)
 
 type ReturnVal = Maybe LocVal
+
+type InterpretingMonadIO = ReaderT Arabica.Abs.VarEnv (StateT Arabica.Abs.LocMemory (ExceptT Arabica.Abs.Exception IO))
+type Result = InterpretingMonadIO LocVal
+type StmtState = (Arabica.Abs.VarEnv, Arabica.Abs.ReturnVal, Arabica.Abs.LoopState)
 
 data LoopState = BreakState | ContState | NoLoopState
   deriving (C.Show, C.Eq)
