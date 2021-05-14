@@ -22,6 +22,7 @@ import Arabica.Lex   ( Token )
 import Arabica.Par   ( pProgram, myLexer )
 import Arabica.Print ( Print, printTree )
 import Arabica.Skel  ( transProgram )
+import Arabica.TypeCheck
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
 import qualified Data.Map as M

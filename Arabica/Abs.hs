@@ -88,6 +88,7 @@ newtype Ident = Ident String
 
 type VarEnv = M.Map Ident (Location, Bool)
 type LocEnv = M.Map Location LocVal
+type TypeEnv = M.Map Ident Type
 type LocMemory = (LocEnv, Location)
 type ExpM a = ReaderT VarEnv Maybe a
 
@@ -114,9 +115,14 @@ data Exception
     | ReadOnlyVariable Ident
   deriving (C.Eq, C.Show)
 
+data TypeCheckingError
+    = CustomTypeError String
+  deriving (C.Eq, C.Show)
+
 type ReturnVal = Maybe LocVal
 
 type InterpretingMonadIO = ReaderT Arabica.Abs.VarEnv (StateT Arabica.Abs.LocMemory (ExceptT Arabica.Abs.Exception IO))
+type TypeCheckingMonadIO = ReaderT Arabica.Abs.TypeEnv (ExceptT Arabica.Abs.TypeCheckingError IO)
 type Result = InterpretingMonadIO LocVal
 type StmtState = (Arabica.Abs.VarEnv, Arabica.Abs.ReturnVal, Arabica.Abs.LoopState)
 
