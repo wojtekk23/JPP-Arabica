@@ -26,19 +26,35 @@ typeCheckProgram x = case x of
       let Arabica.Abs.FnDef _ ident _ _ = topdef
       typeTopDef topdef
       fnType <- getTopDefType topdef
+      -- lift $ lift $ putStrLn $ unwords ["fnType", show fnType]
       local (M.insert ident fnType) $ checkTopDefs topdefs
 
 typeTopDef :: Arabica.Abs.TopDef -> Arabica.Abs.TypeCheckingMonadIO ()
 typeTopDef x = case x of
   Arabica.Abs.FnDef type_ ident args block -> do
     typeEnv <- ask
+    topDefType <- getTopDefType x
     let argsTypeEnv = foldl (\env (argType, argIdent) -> M.insert argIdent argType env) typeEnv $ map (\(Arabica.Abs.Arg argType argIdent) -> (argType, argIdent)) args
-    let newTypeEnv = M.insert ident type_ argsTypeEnv
+    let newTypeEnv = M.insert ident topDefType argsTypeEnv
     local (const newTypeEnv) $ typeBlock type_ block
 
 typeBlock :: Arabica.Abs.Type -> Arabica.Abs.Block -> Arabica.Abs.TypeCheckingMonadIO ()
-typeBlock type_ x = case x of
-  Arabica.Abs.Block stmts -> typeError "type block"
+typeBlock retType x = case x of
+  Arabica.Abs.Block stmts -> runTypeStmts retType stmts
+  where
+    runTypeStmts :: Arabica.Abs.Type -> [Arabica.Abs.Stmt] -> Arabica.Abs.TypeCheckingMonadIO ()
+    runTypeStmts type_ [] = pure ()
+    runTypeStmts type_ (stmt:stmts) = do
+      newEnv <- typeStmts type_ stmt
+      local (const newEnv) $ runTypeStmts type_ stmts
+
+typeItem :: Arabica.Abs.Type -> Arabica.Abs.Item -> Arabica.Abs.TypeCheckingMonadIO Arabica.Abs.Ident
+typeItem itemType x = case x of
+  Arabica.Abs.NoInit ident -> pure ident
+  Arabica.Abs.Init ident expr -> do
+    exprType <- typeExpr expr
+    if exprType == itemType then pure ident
+    else typeError $ unwords ["Variable", show ident, "is of type", show itemType, "but was initialized with type", show exprType]
 
 typeStmts :: Arabica.Abs.Type -> Arabica.Abs.Stmt -> Arabica.Abs.TypeCheckingMonadIO Arabica.Abs.TypeEnv
 typeStmts fnType x = case x of
@@ -46,7 +62,11 @@ typeStmts fnType x = case x of
   Arabica.Abs.BStmt block -> do
     typeBlock fnType block
     ask
-  Arabica.Abs.Decl type_ items -> typeError "type decl"
+  Arabica.Abs.Decl type_ items -> do
+    varIdents <- mapM (typeItem type_) items
+    typeEnv <- ask
+    let newTypeEnv = foldl (\env ident -> M.insert ident type_ env) typeEnv varIdents
+    pure newTypeEnv
   Arabica.Abs.Ass ident expr -> do
     typeEnv <- ask
     let maybeVar = M.lookup ident typeEnv
@@ -81,25 +101,73 @@ typeStmts fnType x = case x of
     case valType of
       Arabica.Abs.Int -> ask
       _ -> typeError $ unwords ["Variable", show x, "cannot be decremented because it is not an integer"]
-  Arabica.Abs.Ret expr -> typeError "type Ret"
-  Arabica.Abs.VRet -> typeError "type VRet"
-  Arabica.Abs.Cond expr stmt -> typeError "type Cond"
-  Arabica.Abs.CondElse expr stmt1 stmt2 -> typeError "type CondElse"
-  Arabica.Abs.While expr stmt -> typeError "type While"
+  Arabica.Abs.Ret expr -> do
+    exprType <- typeExpr expr
+    if exprType == fnType then ask
+    else typeError $ unwords ["Function is of type", show fnType, "but it contains a statement returning type", show exprType]
+  Arabica.Abs.VRet -> do
+    if fnType == Arabica.Abs.Void then ask
+    else typeError $ unwords ["Function is of type", show fnType, "but it contains a void return statement"]
+  Arabica.Abs.Cond expr stmt -> typeStmts fnType $ Arabica.Abs.CondElse expr stmt $ Arabica.Abs.Empty
+  Arabica.Abs.CondElse expr stmt1 stmt2 -> do
+    condType <- typeExpr expr
+    if condType /= Arabica.Abs.Bool && condType /= Arabica.Abs.Int then
+      typeError $ unwords ["Condition is of type", show condType, "but it has to either a boolean or integer value"]
+    else do
+      typeStmts fnType stmt1
+      typeStmts fnType stmt2
+      ask
+  Arabica.Abs.While expr stmt -> do
+    condType <- typeExpr expr
+    if condType /= Arabica.Abs.Bool && condType /= Arabica.Abs.Int then
+      typeError $ unwords ["Condition is of type", show condType, "but it has to either a boolean or integer value"]
+    else do
+      typeStmts fnType stmt
+      ask
   Arabica.Abs.Break -> ask
   Arabica.Abs.Continue -> ask
   Arabica.Abs.SExp expr -> do
     typeExpr expr
     ask
-  Arabica.Abs.ForTo ident expr1 expr2 stmt -> typeError "type ForTo"
+  Arabica.Abs.ForTo ident expr1 expr2 stmt -> do
+    beginType <- typeExpr expr1
+    case beginType of
+      Arabica.Abs.Int -> do
+        endType <- typeExpr expr2
+        case endType of
+          Arabica.Abs.Int -> do
+            local (M.insert ident Arabica.Abs.Int) $ typeStmts fnType stmt
+            ask
+          _ -> typeError $ unwords ["End expression in for loop should be of type Int"]
+      _ -> typeError $ unwords ["Begin expression in for loop should be of type Int"]
   Arabica.Abs.Print expr -> do
     typeExpr expr
     ask
 
+confirmTypes :: Arabica.Abs.Ident -> Integer -> [Arabica.Abs.Type] -> [Arabica.Abs.Type] -> Arabica.Abs.TypeCheckingMonadIO ()
+confirmTypes _ _ [] [] = pure ()
+confirmTypes ident _ _ [] = typeError $ unwords ["Too many arguments given to a function", show ident]
+confirmTypes ident _ [] _ = typeError $ unwords ["Not enough arguments given to a function", show ident]
+confirmTypes ident num (exprType:exprs) (argType:args) = do
+  if exprType /= argType then typeError $ unwords ["Argument", show num, "given to a function", show ident, "is of type", show exprType, "but should be of type", show argType]
+  else confirmTypes ident (num+1) exprs args
+
 typeExpr :: Arabica.Abs.Expr -> Arabica.Abs.TypeCheckingMonadIO Arabica.Abs.Type
 typeExpr x = case x of
   Arabica.Abs.EArray type_ _ -> pure $ Arabica.Abs.Array type_
-  Arabica.Abs.EArrElem ident expr -> typeError "typeExpr EArrElem"
+  Arabica.Abs.EArrElem ident expr -> do
+    typeEnv <- ask
+    let maybeArrType = M.lookup ident typeEnv
+    case maybeArrType of
+      Nothing -> typeError $ unwords ["No identifier", show ident, "was found"]
+      Just arrType -> do
+        case arrType of
+          Arabica.Abs.Array elemType -> do
+            ixType <- typeExpr expr
+            case ixType of
+              Arabica.Abs.Int -> pure elemType
+              _ -> typeError $ unwords ["Arrays must be indexed with an integer"]
+          _ -> typeError $ unwords ["Variable", show ident, "is not an array"]
   Arabica.Abs.ELambda type_ args block -> do
     typeEnv <- ask
     let newTypeEnv = foldl (\env (argType, argIdent) -> M.insert argIdent argType env) typeEnv $ map (\(Arabica.Abs.Arg argType argIdent) -> (argType, argIdent)) args
@@ -114,7 +182,19 @@ typeExpr x = case x of
   Arabica.Abs.ELitInt integer -> pure $ Arabica.Abs.Int
   Arabica.Abs.ELitTrue -> pure $ Arabica.Abs.Bool
   Arabica.Abs.ELitFalse -> pure $ Arabica.Abs.Bool
-  Arabica.Abs.EApp ident exprs -> typeError "typeExpr EApp"
+  Arabica.Abs.EApp ident exprs -> do
+    typeEnv <- ask
+    -- lift $ lift $ putStrLn $ show typeEnv
+    let maybeVarType = M.lookup ident typeEnv
+    case maybeVarType of
+      Nothing -> typeError $ unwords ["No identifier", "\"" ++ show ident ++ "\"", "was found"]
+      Just varType -> do
+        case varType of
+          Arabica.Abs.Fun funType argTypes -> do
+            exprTypes <- mapM typeExpr exprs
+            confirmTypes ident 1 exprTypes argTypes
+            pure funType
+          _ -> typeError $ unwords ["Variable", show ident, "is not a function"]
   Arabica.Abs.EString string -> pure $ Arabica.Abs.Str
   Arabica.Abs.Neg expr -> do
     exprType <- typeExpr expr

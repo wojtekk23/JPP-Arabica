@@ -2,7 +2,7 @@
 // Wypisuje 12 razy "YES"
 
 int main() {
-    Array<int> new_arr = new int[13];
+    Array<int> arr = new int[13];
     int x = -2, y = 2;
     string yes_str = "YES", no_str = "NO";
     
