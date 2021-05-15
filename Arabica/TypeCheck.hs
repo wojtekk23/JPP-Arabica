@@ -32,11 +32,15 @@ typeCheckProgram x = case x of
 typeTopDef :: Arabica.Abs.TopDef -> Arabica.Abs.TypeCheckingMonadIO ()
 typeTopDef x = case x of
   Arabica.Abs.FnDef type_ ident args block -> do
-    typeEnv <- ask
-    topDefType <- getTopDefType x
-    let argsTypeEnv = foldl (\env (argType, argIdent) -> M.insert argIdent argType env) typeEnv $ map (\(Arabica.Abs.Arg argType argIdent) -> (argType, argIdent)) args
-    let newTypeEnv = M.insert ident topDefType argsTypeEnv
-    local (const newTypeEnv) $ typeBlock type_ block
+    let Arabica.Abs.Ident name = ident
+    if name == "main" && (type_ /= Arabica.Abs.Int || length args /= 0) then do
+      typeError $ unwords ["Main function should have a return type int and take no arguments"]
+    else do
+      typeEnv <- ask
+      topDefType <- getTopDefType x
+      let argsTypeEnv = foldl (\env (argType, argIdent) -> M.insert argIdent argType env) typeEnv $ map (\(Arabica.Abs.Arg argType argIdent) -> (argType, argIdent)) args
+      let newTypeEnv = M.insert ident topDefType argsTypeEnv
+      local (const newTypeEnv) $ typeBlock type_ block
 
 typeBlock :: Arabica.Abs.Type -> Arabica.Abs.Block -> Arabica.Abs.TypeCheckingMonadIO ()
 typeBlock retType x = case x of
