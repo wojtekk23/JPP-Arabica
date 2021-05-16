@@ -2,17 +2,26 @@
 // Wypisuje 12 razy "YES"
 
 int main() {
-    Array<int> arr = new int[13];
+    Array<int> arr = new int[12];
     int x = -2, y = 2;
     string yes_str = "YES", no_str = "NO";
     
     [ int ] ( int, int ) mul = [int](int a, int x){
+        //print("mul:");
+        //print(a);
+        //print(x);
+        //print("endmul");
         return a*x;
     };
     
     for i = 0 to 12 do {
         arr[i] = mul(y, i);
+        
         x = x + y;
+        //print("x:");
+        //print(x);
+        //print("arr[i]:");
+        //print(arr[i]);
         
         if (arr[i] == x) {
             print(yes_str);

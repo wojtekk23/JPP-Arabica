@@ -24,11 +24,11 @@ import Control.Monad.Trans.Except
 
 type Err = Either String
 
-assignArgsToVals :: Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.Arg] -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
+assignArgsToVals :: Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.AbsArg] -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
 assignArgsToVals _ [] [] = ask
 assignArgsToVals ident _ [] = errorMessage $ Arabica.Abs.TooManyArgs ident
 assignArgsToVals ident [] _ = errorMessage $ Arabica.Abs.NotEnoughArgs ident
-assignArgsToVals ident (e:es) ((Arabica.Abs.Arg type_ ident_):as) = do
+assignArgsToVals ident (e:es) ((Arabica.Abs.AbsArg type_ ident_):as) = do
   val <- transExpr e
   newVarEnv <- newVariable False ident_ val
   local (const newVarEnv) $ assignArgsToVals ident es as
@@ -39,7 +39,7 @@ transIdent x = case x of
 
 transProgram :: Arabica.Abs.Program -> Arabica.Abs.InterpretingMonadIO ()
 transProgram x = case x of
-  Arabica.Abs.Program topdefs -> do
+  Arabica.Abs.Program _ topdefs -> do
     runTopDefs topdefs
   where
     runTopDefs [] = pure ()
@@ -50,22 +50,22 @@ transProgram x = case x of
 
 transTopDef :: Arabica.Abs.TopDef -> Arabica.Abs.InterpretingMonadIO (Arabica.Abs.VarEnv, Arabica.Abs.ReturnVal)
 transTopDef x = case x of
-  Arabica.Abs.FnDef type_ ident args block -> do
+  Arabica.Abs.FnDef _ type_ ident args block -> do
     -- Na razie tylko uruchamiaj main
     let Arabica.Abs.Ident str = ident
-    newVarEnv <- newVariable False ident (Arabica.Abs.FunVal type_ args block M.empty)
+    let absType = transType type_
+    let absArgs = map transArg args
+    currEnv <- ask
+    closure <- getClosureFromCurrentEnvironment currEnv
+    newVarEnv <- newVariable False ident (Arabica.Abs.FunVal absType absArgs block closure)
     if str == "main" then  do
       (newestEnv, newestReturn, _) <- local (const newVarEnv) $ transBlock False block
       pure $ (newestEnv, newestReturn)
     else pure $ (newVarEnv, Nothing)
 
-transArg :: Arabica.Abs.Arg -> Arabica.Abs.InterpretingMonadIO ()
-transArg x = case x of
-  Arabica.Abs.Arg type_ ident -> failure x
-
 transBlock :: Bool -> Arabica.Abs.Block -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
 transBlock inLoop x = case x of
-  Arabica.Abs.Block stmts -> runStmts stmts
+  Arabica.Abs.Block _ stmts -> runStmts stmts
   where
     runStmts [] = normalPass
     runStmts (stmt:stmts) = do
@@ -84,20 +84,19 @@ transBlock inLoop x = case x of
               _ -> pure $ (newVarEnv, retVal, loopState)
           else local (const newVarEnv) $ runStmts stmts
 
--- Bool - czy jesteśmy w pętli
 transStmt :: Bool -> Arabica.Abs.Stmt -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
 transStmt inLoop x = case x of
-  Arabica.Abs.Empty -> normalPass
-  Arabica.Abs.BStmt block -> transBlock inLoop block
-  Arabica.Abs.Decl type_ items -> do
+  Arabica.Abs.Empty _ -> normalPass
+  Arabica.Abs.BStmt _ block -> transBlock inLoop block
+  Arabica.Abs.Decl p type_ items -> do
     -- Na razie tylko int
     case items of
       [] -> normalPass
       (x:xs) -> do
         -- debugMessage $ unwords ["DECL", show (x:xs)]
         newVarEnv <- transItem False x
-        local (const newVarEnv) $ transStmt inLoop (Arabica.Abs.Decl type_ xs)
-  Arabica.Abs.Ass ident expr -> do
+        local (const newVarEnv) $ transStmt inLoop (Arabica.Abs.Decl p type_ xs)
+  Arabica.Abs.Ass _ ident expr ->  do
     -- env <- get
     -- let locVal = runReaderT (transExpr expr) env
     -- case locVal of
@@ -106,7 +105,7 @@ transStmt inLoop x = case x of
     val <- transExpr expr
     updateVariable ident val
     normalPass
-  Arabica.Abs.ArrAss ident posExpr valExpr -> do
+  Arabica.Abs.ArrAss _ ident posExpr valExpr -> do
     arrVal <- readVariable ident
     case arrVal of
       Arabica.Abs.ArrVal type_ arr -> do
@@ -124,23 +123,24 @@ transStmt inLoop x = case x of
               else errorMessage $ Arabica.Abs.ArrayAssignMismatch ident
           _ -> errorMessage $ Arabica.Abs.IndexNotInteger ident
       _ -> errorMessage $ Arabica.Abs.NotAnArray ident
-  Arabica.Abs.Incr ident -> failure "Incr"
-  Arabica.Abs.Decr ident -> failure "Decr"
-  Arabica.Abs.Ret expr -> do
+  Arabica.Abs.Incr _ ident -> failure "Incr"
+  Arabica.Abs.Decr _ ident -> failure "Decr"
+  Arabica.Abs.Ret _ expr -> do
     retVal <- transExpr expr
     varEnv <- ask
     pure $ (varEnv, Just retVal, Arabica.Abs.NoLoopState)
-  Arabica.Abs.VRet -> do
+  Arabica.Abs.VRet _ -> do
     varEnv <- ask
     pure $ (varEnv, Just Arabica.Abs.VoidVal, Arabica.Abs.NoLoopState)
-  Arabica.Abs.Cond expr stmt -> transStmt inLoop $ Arabica.Abs.CondElse expr stmt Arabica.Abs.Empty
-  Arabica.Abs.CondElse expr stmt1 stmt2 -> do
+  -- TODO: Czy poniższy myk z Arabica.Abs.Empty jest ok?
+  Arabica.Abs.Cond p expr stmt -> transStmt inLoop $ Arabica.Abs.CondElse p expr stmt (Arabica.Abs.Empty p)
+  Arabica.Abs.CondElse _ expr stmt1 stmt2 -> do
     val <- transExpr expr
     -- Akceptujemy tylko inty i boole
     case val of
       Arabica.Abs.BoolVal b -> transStmt inLoop $ if' b stmt1 stmt2
       Arabica.Abs.IntegerVal n -> transStmt inLoop $ if' (n /= 0) stmt1 stmt2
-  Arabica.Abs.While expr stmt -> do
+  Arabica.Abs.While _ expr stmt -> do
     val <- transExpr expr
     -- TODO: Napisz to bez powtórzeń
     case val of
@@ -156,29 +156,16 @@ transStmt inLoop x = case x of
                 _ -> transStmt inLoop x
         else
           normalPass
-      Arabica.Abs.IntegerVal n -> do
-        if n /= 0 then do
-          (newVarEnv, retVal, loopState) <- transStmt True stmt
-          case retVal of
-            Just x -> pure $ (newVarEnv, retVal, loopState)
-            Nothing -> do
-              case loopState of
-                Arabica.Abs.BreakState -> normalPass
-                -- TODO: Czy tutaj inLoop czy może True? A może False xdd
-                _ -> transStmt inLoop x
-        else
-          normalPass
-      _ -> failure "while"
-  Arabica.Abs.Break -> do
+  Arabica.Abs.Break _ -> do
     varEnv <- ask
     pure $ (varEnv, Nothing, Arabica.Abs.BreakState)
-  Arabica.Abs.Continue -> do
+  Arabica.Abs.Continue _ -> do
     varEnv <- ask
     pure $ (varEnv, Nothing, Arabica.Abs.ContState)
-  Arabica.Abs.SExp expr -> do
+  Arabica.Abs.SExp _ expr -> do
     transExpr expr
     normalPass
-  Arabica.Abs.ForTo ident expr1 expr2 stmt -> do
+  Arabica.Abs.ForTo _ ident expr1 expr2 stmt -> do
     -- transItem True item
     -- val <- transExpr expr
     -- TODO: NIE DZIAŁA RETURN W PĘTLACH!!!!
@@ -203,7 +190,7 @@ transStmt inLoop x = case x of
               case loopState of
                 Arabica.Abs.BreakState -> normalPass
                 _ -> runForLoop ident (curr+1) n2 stmt
-  Arabica.Abs.Print expr -> do
+  Arabica.Abs.Print _ expr -> do
     -- Na razie tylko inty
     val <- transExpr expr
     case val of
@@ -213,31 +200,22 @@ transStmt inLoop x = case x of
       _ -> failure "Can only print integers, booleans and strings"
     normalPass
 
--- Bool - readonly?
 transItem :: Bool -> Arabica.Abs.Item -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
 transItem readOnly x = case x of
-  Arabica.Abs.NoInit ident -> failure "NoInit"
-  Arabica.Abs.Init ident expr -> do
+  Arabica.Abs.NoInit _ ident -> failure "NoInit"
+  Arabica.Abs.Init _ ident expr -> do
     val <- transExpr expr
     newVarEnv <- newVariable readOnly ident val
     -- debugMessage "INIT"
     pure $ newVarEnv
 
-transType :: Arabica.Abs.Type -> Arabica.Abs.InterpretingMonadIO ()
-transType x = case x of
-  Arabica.Abs.Int -> failure x
-  Arabica.Abs.Str -> failure x
-  Arabica.Abs.Bool -> failure x
-  Arabica.Abs.Void -> failure x
-  Arabica.Abs.Fun type_ types -> failure x
-  Arabica.Abs.Array type_ -> failure x
-
 transExpr :: Arabica.Abs.Expr -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.LocVal
 transExpr x = case x of
-  Arabica.Abs.EArray type_ integer -> do
-    initVal <- defaultVal type_
-    pure $ Arabica.Abs.ArrVal type_ (array (0, integer-1) [(ix, initVal) | ix <- [0..integer-1]])
-  Arabica.Abs.EArrElem ident expr -> do
+  Arabica.Abs.EArray _ type_ integer -> do
+    let absType = transType type_
+    initVal <- defaultVal absType
+    pure $ Arabica.Abs.ArrVal absType (array (0, integer-1) [(ix, initVal) | ix <- [0..integer-1]])
+  Arabica.Abs.EArrElem _ ident expr -> do
     val <- readVariable ident
     pos <- transExpr expr
     case val of
@@ -250,16 +228,18 @@ transExpr x = case x of
             else do
               pure $ arr ! n
       _ -> errorMessage $ Arabica.Abs.NotAnArray ident
-  Arabica.Abs.ELambda type_ args block -> do
+  Arabica.Abs.ELambda _ type_ args block -> do
+    let absType = transType type_
+    let absArgs = map transArg args
     varEnv <- ask
     closure <- getClosureFromCurrentEnvironment varEnv
     -- debugMessage $ unwords ["create function with args", show args]
-    pure $ Arabica.Abs.FunVal type_ args block closure
-  Arabica.Abs.EVar ident -> readVariable ident
-  Arabica.Abs.ELitInt integer -> pure $ Arabica.Abs.IntegerVal $ integer
-  Arabica.Abs.ELitTrue -> pure $ Arabica.Abs.BoolVal $ True
-  Arabica.Abs.ELitFalse -> pure $ Arabica.Abs.BoolVal $ False
-  Arabica.Abs.EApp ident exprs -> do
+    pure $ Arabica.Abs.FunVal absType absArgs block closure
+  Arabica.Abs.EVar _ ident -> readVariable ident
+  Arabica.Abs.ELitInt _ integer -> pure $ Arabica.Abs.IntegerVal $ integer
+  Arabica.Abs.ELitTrue _ -> pure $ Arabica.Abs.BoolVal $ True
+  Arabica.Abs.ELitFalse _ -> pure $ Arabica.Abs.BoolVal $ False
+  Arabica.Abs.EApp _ ident exprs -> do
     varEnv <- ask
     maybeFun <- readVariable ident
     case maybeFun of
@@ -267,10 +247,12 @@ transExpr x = case x of
       Arabica.Abs.FunVal type_ args block closure -> do
         -- TODO: przyzwala na pozyskiwanie zmiennych z środowiska funkcji wywołującej, trzeba to zmienić
         -- i dodać rozróżnienie na funkcje i lambdy (ewentulanie dodać do FunVal środowisko)
-        oldFunVarEnv <- assignArgsToVals ident exprs args
-        funVarEnv <- local (const oldFunVarEnv) $ assignClosureToVals closure
+        oldFunVarEnv <- local (const varEnv) $ assignClosureToVals closure
+        funVarEnv <- local (const oldFunVarEnv) $ assignArgsToVals ident exprs args
+        -- testtest <- getClosureFromCurrentEnvironment funVarEnv
         -- let funVarEnv = oldfunVarEnv
         -- debugMessage $ unwords ["apply function with environment", show funVarEnv]
+        -- debugMessage $ unwords ["apply function with state", show currState]
         (_, retVal, _) <- local (const funVarEnv) $ transBlock False block
         case retVal of
           Just x -> pure x
@@ -279,43 +261,43 @@ transExpr x = case x of
               Arabica.Abs.Void -> pure Arabica.Abs.VoidVal
               _ -> errorMessage $ Arabica.Abs.NoValueReturned ident type_
       _ -> errorMessage $ Arabica.Abs.NotAFunction ident
-  Arabica.Abs.EString string -> pure $ Arabica.Abs.StringVal $ string
-  Arabica.Abs.Neg expr -> do
+  Arabica.Abs.EString _ string -> pure $ Arabica.Abs.StringVal $ string
+  Arabica.Abs.Neg _ expr -> do
     Arabica.Abs.IntegerVal n <- transExpr expr
     pure $ Arabica.Abs.IntegerVal $ (-n)
-  Arabica.Abs.Not expr -> do
+  Arabica.Abs.Not _ expr -> do
     Arabica.Abs.BoolVal b <- transExpr expr
     pure $ Arabica.Abs.BoolVal $ not b
-  Arabica.Abs.EMul expr1 mulop expr2 -> do
+  Arabica.Abs.EMul _ expr1 mulop expr2 -> do
     Arabica.Abs.IntegerVal n1 <- transExpr expr1
     Arabica.Abs.IntegerVal n2 <- transExpr expr2
     transMulOp mulop n1 n2
-  Arabica.Abs.EAdd expr1 addop expr2 -> do
+  Arabica.Abs.EAdd _ expr1 addop expr2 -> do
     Arabica.Abs.IntegerVal n1 <- transExpr expr1
     Arabica.Abs.IntegerVal n2 <- transExpr expr2
     transAddOp addop n1 n2
-  Arabica.Abs.ERel expr1 relop expr2 -> do
+  Arabica.Abs.ERel _ expr1 relop expr2 -> do
     Arabica.Abs.IntegerVal n1 <- transExpr expr1
     Arabica.Abs.IntegerVal n2 <- transExpr expr2
     transRelOp relop n1 n2
-  Arabica.Abs.EAnd expr1 expr2 -> do
+  Arabica.Abs.EAnd _ expr1 expr2 -> do
     Arabica.Abs.BoolVal b1 <- transExpr expr1
     Arabica.Abs.BoolVal b2 <- transExpr expr2
     pure $ Arabica.Abs.BoolVal $ b1 && b2
-  Arabica.Abs.EOr expr1 expr2 -> do
+  Arabica.Abs.EOr _ expr1 expr2 -> do
     Arabica.Abs.BoolVal b1 <- transExpr expr1
     Arabica.Abs.BoolVal b2 <- transExpr expr2
     pure $ Arabica.Abs.BoolVal $ b1 || b2
 
 transAddOp :: Arabica.Abs.AddOp -> Integer -> Integer -> Arabica.Abs.Result
 transAddOp x n1 n2 = case x of
-  Arabica.Abs.Plus -> pure $ Arabica.Abs.IntegerVal $ n1 + n2
-  Arabica.Abs.Minus -> pure $ Arabica.Abs.IntegerVal $ n1 - n2
+  Arabica.Abs.Plus _ -> pure $ Arabica.Abs.IntegerVal $ n1 + n2
+  Arabica.Abs.Minus _ -> pure $ Arabica.Abs.IntegerVal $ n1 - n2
 
 transMulOp :: Arabica.Abs.MulOp -> Integer -> Integer -> Arabica.Abs.Result
 transMulOp x n1 n2 = case x of
-  Arabica.Abs.Times -> pure $ Arabica.Abs.IntegerVal $ n1 * n2
-  Arabica.Abs.Div -> do
+  Arabica.Abs.Times _ -> pure $ Arabica.Abs.IntegerVal $ n1 * n2
+  Arabica.Abs.Div _ -> do
     if n2 == 0 then
       errorMessage $ Arabica.Abs.DivisionByZero
     else
@@ -323,9 +305,9 @@ transMulOp x n1 n2 = case x of
 
 transRelOp :: Arabica.Abs.RelOp -> Integer -> Integer -> Arabica.Abs.Result
 transRelOp x n1 n2 = case x of
-  Arabica.Abs.LTH -> pure $ Arabica.Abs.BoolVal $ n1 < n2
-  Arabica.Abs.LE -> pure $ Arabica.Abs.BoolVal $ n1 <= n2
-  Arabica.Abs.GTH -> pure $ Arabica.Abs.BoolVal $ n1 > n2
-  Arabica.Abs.GE -> pure $ Arabica.Abs.BoolVal $ n1 >= n2
-  Arabica.Abs.EQU -> pure $ Arabica.Abs.BoolVal $ n1 == n2
-  Arabica.Abs.NE -> pure $ Arabica.Abs.BoolVal $ n1 /= n2
+  Arabica.Abs.LTH _ -> pure $ Arabica.Abs.BoolVal $ n1 < n2
+  Arabica.Abs.LE _ -> pure $ Arabica.Abs.BoolVal $ n1 <= n2
+  Arabica.Abs.GTH _ -> pure $ Arabica.Abs.BoolVal $ n1 > n2
+  Arabica.Abs.GE _ -> pure $ Arabica.Abs.BoolVal $ n1 >= n2
+  Arabica.Abs.EQU _ -> pure $ Arabica.Abs.BoolVal $ n1 == n2
+  Arabica.Abs.NE _ -> pure $ Arabica.Abs.BoolVal $ n1 /= n2

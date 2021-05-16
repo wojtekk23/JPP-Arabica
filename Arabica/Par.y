@@ -14,7 +14,7 @@ import Arabica.Lex
 
 }
 
-%name pProgram Program
+%name pProgram_internal Program
 -- no lexer declaration
 %monad { Err } { (>>=) } { return }
 %tokentype {Token}
@@ -61,145 +61,152 @@ import Arabica.Lex
   '{' { PT _ (TS _ 40) }
   '||' { PT _ (TS _ 41) }
   '}' { PT _ (TS _ 42) }
-  L_Ident  { PT _ (TV $$) }
-  L_integ  { PT _ (TI $$) }
-  L_quoted { PT _ (TL $$) }
+  L_Ident  { PT _ (TV _) }
+  L_integ  { PT _ (TI _) }
+  L_quoted { PT _ (TL _) }
 
 %%
 
-Ident :: { Arabica.Abs.Ident }
-Ident  : L_Ident { Arabica.Abs.Ident $1 }
+Ident :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Ident) }
+Ident  : L_Ident { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Ident (tokenText $1)) }
 
-Integer :: { Integer }
-Integer  : L_integ  { (read $1) :: Integer }
+Integer :: { (Arabica.Abs.BNFC'Position, Integer) }
+Integer  : L_integ  { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), (read (tokenText $1)) :: Integer) }
 
-String  :: { String }
-String   : L_quoted { $1 }
+String  :: { (Arabica.Abs.BNFC'Position, String) }
+String   : L_quoted { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), ((\(PT _ (TL s)) -> s) $1)) }
 
-Program :: { Arabica.Abs.Program }
-Program : ListTopDef { Arabica.Abs.Program $1 }
+Program :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Program) }
+Program : ListTopDef { (fst $1, Arabica.Abs.Program (fst $1) (snd $1)) }
 
-TopDef :: { Arabica.Abs.TopDef }
-TopDef : Type Ident '(' ListArg ')' Block { Arabica.Abs.FnDef $1 $2 $4 $6 }
+TopDef :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.TopDef) }
+TopDef : Type Ident '(' ListArg ')' Block { (fst $1, Arabica.Abs.FnDef (fst $1) (snd $1) (snd $2) (snd $4) (snd $6)) }
 
-ListTopDef :: { [Arabica.Abs.TopDef] }
-ListTopDef : TopDef { (:[]) $1 } | TopDef ListTopDef { (:) $1 $2 }
+ListTopDef :: { (Arabica.Abs.BNFC'Position, [Arabica.Abs.TopDef]) }
+ListTopDef : TopDef { (fst $1, (:[]) (snd $1)) }
+           | TopDef ListTopDef { (fst $1, (:) (snd $1) (snd $2)) }
 
-Arg :: { Arabica.Abs.Arg }
-Arg : Type Ident { Arabica.Abs.Arg $1 $2 }
+Arg :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Arg) }
+Arg : Type Ident { (fst $1, Arabica.Abs.Arg (fst $1) (snd $1) (snd $2)) }
 
-ListArg :: { [Arabica.Abs.Arg] }
-ListArg : {- empty -} { [] }
-        | Arg { (:[]) $1 }
-        | Arg ',' ListArg { (:) $1 $3 }
+ListArg :: { (Arabica.Abs.BNFC'Position, [Arabica.Abs.Arg]) }
+ListArg : {- empty -} { (Arabica.Abs.BNFC'NoPosition, []) }
+        | Arg { (fst $1, (:[]) (snd $1)) }
+        | Arg ',' ListArg { (fst $1, (:) (snd $1) (snd $3)) }
 
-Block :: { Arabica.Abs.Block }
-Block : '{' ListStmt '}' { Arabica.Abs.Block $2 }
+Block :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Block) }
+Block : '{' ListStmt '}' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Block (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2)) }
 
-ListStmt :: { [Arabica.Abs.Stmt] }
-ListStmt : {- empty -} { [] } | Stmt ListStmt { (:) $1 $2 }
+ListStmt :: { (Arabica.Abs.BNFC'Position, [Arabica.Abs.Stmt]) }
+ListStmt : {- empty -} { (Arabica.Abs.BNFC'NoPosition, []) }
+         | Stmt ListStmt { (fst $1, (:) (snd $1) (snd $2)) }
 
-Stmt :: { Arabica.Abs.Stmt }
-Stmt : ';' { Arabica.Abs.Empty }
-     | Block { Arabica.Abs.BStmt $1 }
-     | Type ListItem ';' { Arabica.Abs.Decl $1 $2 }
-     | Ident '=' Expr ';' { Arabica.Abs.Ass $1 $3 }
-     | Ident '[' Expr6 ']' '=' Expr ';' { Arabica.Abs.ArrAss $1 $3 $6 }
-     | Ident '++' ';' { Arabica.Abs.Incr $1 }
-     | Ident '--' ';' { Arabica.Abs.Decr $1 }
-     | 'return' Expr ';' { Arabica.Abs.Ret $2 }
-     | 'return' ';' { Arabica.Abs.VRet }
-     | 'if' '(' Expr ')' Stmt { Arabica.Abs.Cond $3 $5 }
-     | 'if' '(' Expr ')' Stmt 'else' Stmt { Arabica.Abs.CondElse $3 $5 $7 }
-     | 'while' '(' Expr ')' Stmt { Arabica.Abs.While $3 $5 }
-     | 'break' ';' { Arabica.Abs.Break }
-     | 'continue' ';' { Arabica.Abs.Continue }
-     | Expr ';' { Arabica.Abs.SExp $1 }
-     | 'for' Ident '=' Expr 'to' Expr 'do' Stmt { Arabica.Abs.ForTo $2 $4 $6 $8 }
-     | 'print(' Expr ')' { Arabica.Abs.Print $2 }
+Stmt :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Stmt) }
+Stmt : ';' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Empty (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+     | Block { (fst $1, Arabica.Abs.BStmt (fst $1) (snd $1)) }
+     | Type ListItem ';' { (fst $1, Arabica.Abs.Decl (fst $1) (snd $1) (snd $2)) }
+     | Ident '=' Expr ';' { (fst $1, Arabica.Abs.Ass (fst $1) (snd $1) (snd $3)) }
+     | Ident '[' Expr6 ']' '=' Expr ';' { (fst $1, Arabica.Abs.ArrAss (fst $1) (snd $1) (snd $3) (snd $6)) }
+     | Ident '++' ';' { (fst $1, Arabica.Abs.Incr (fst $1) (snd $1)) }
+     | Ident '--' ';' { (fst $1, Arabica.Abs.Decr (fst $1) (snd $1)) }
+     | 'return' Expr ';' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Ret (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2)) }
+     | 'return' ';' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.VRet (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+     | 'if' '(' Expr ')' Stmt { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Cond (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $3) (snd $5)) }
+     | 'if' '(' Expr ')' Stmt 'else' Stmt { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.CondElse (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $3) (snd $5) (snd $7)) }
+     | 'while' '(' Expr ')' Stmt { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.While (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $3) (snd $5)) }
+     | 'break' ';' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Break (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+     | 'continue' ';' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Continue (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+     | Expr ';' { (fst $1, Arabica.Abs.SExp (fst $1) (snd $1)) }
+     | 'for' Ident '=' Expr 'to' Expr 'do' Stmt { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.ForTo (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2) (snd $4) (snd $6) (snd $8)) }
+     | 'print(' Expr ')' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Print (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2)) }
 
-Item :: { Arabica.Abs.Item }
-Item : Ident { Arabica.Abs.NoInit $1 }
-     | Ident '=' Expr { Arabica.Abs.Init $1 $3 }
+Item :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Item) }
+Item : Ident { (fst $1, Arabica.Abs.NoInit (fst $1) (snd $1)) }
+     | Ident '=' Expr { (fst $1, Arabica.Abs.Init (fst $1) (snd $1) (snd $3)) }
 
-ListItem :: { [Arabica.Abs.Item] }
-ListItem : Item { (:[]) $1 } | Item ',' ListItem { (:) $1 $3 }
+ListItem :: { (Arabica.Abs.BNFC'Position, [Arabica.Abs.Item]) }
+ListItem : Item { (fst $1, (:[]) (snd $1)) }
+         | Item ',' ListItem { (fst $1, (:) (snd $1) (snd $3)) }
 
-Type :: { Arabica.Abs.Type }
-Type : 'int' { Arabica.Abs.Int }
-     | 'string' { Arabica.Abs.Str }
-     | 'bool' { Arabica.Abs.Bool }
-     | 'void' { Arabica.Abs.Void }
-     | '[' Type ']' '(' ListType ')' { Arabica.Abs.Fun $2 $5 }
-     | 'Array' '<' Type '>' { Arabica.Abs.Array $3 }
+Type :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Type) }
+Type : 'int' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.IntType (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+     | 'string' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.StrTpye (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+     | 'bool' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.BoolType (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+     | 'void' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.VoidType (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+     | '[' Type ']' '(' ListType ')' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.FunType (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2) (snd $5)) }
+     | 'Array' '<' Type '>' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.ArrayType (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $3)) }
 
-ListType :: { [Arabica.Abs.Type] }
-ListType : {- empty -} { [] }
-         | Type { (:[]) $1 }
-         | Type ',' ListType { (:) $1 $3 }
+ListType :: { (Arabica.Abs.BNFC'Position, [Arabica.Abs.Type]) }
+ListType : {- empty -} { (Arabica.Abs.BNFC'NoPosition, []) }
+         | Type { (fst $1, (:[]) (snd $1)) }
+         | Type ',' ListType { (fst $1, (:) (snd $1) (snd $3)) }
 
-Expr9 :: { Arabica.Abs.Expr }
-Expr9 : 'new' Type '[' Integer ']' { Arabica.Abs.EArray $2 $4 }
-      | '(' Expr ')' { $2 }
+Expr9 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr9 : 'new' Type '[' Integer ']' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.EArray (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2) (snd $4)) }
+      | '(' Expr ')' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), (snd $2)) }
 
-Expr8 :: { Arabica.Abs.Expr }
-Expr8 : Ident '[' Expr6 ']' { Arabica.Abs.EArrElem $1 $3 }
-      | Expr9 { $1 }
+Expr8 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr8 : Ident '[' Expr6 ']' { (fst $1, Arabica.Abs.EArrElem (fst $1) (snd $1) (snd $3)) }
+      | Expr9 { (fst $1, (snd $1)) }
 
-Expr7 :: { Arabica.Abs.Expr }
-Expr7 : '[' Type ']' '(' ListArg ')' Block { Arabica.Abs.ELambda $2 $5 $7 }
-      | Expr8 { $1 }
+Expr7 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr7 : '[' Type ']' '(' ListArg ')' Block { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.ELambda (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2) (snd $5) (snd $7)) }
+      | Expr8 { (fst $1, (snd $1)) }
 
-Expr6 :: { Arabica.Abs.Expr }
-Expr6 : Ident { Arabica.Abs.EVar $1 }
-      | Integer { Arabica.Abs.ELitInt $1 }
-      | 'true' { Arabica.Abs.ELitTrue }
-      | 'false' { Arabica.Abs.ELitFalse }
-      | Ident '(' ListExpr ')' { Arabica.Abs.EApp $1 $3 }
-      | String { Arabica.Abs.EString $1 }
-      | Expr7 { $1 }
+Expr6 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr6 : Ident { (fst $1, Arabica.Abs.EVar (fst $1) (snd $1)) }
+      | Integer { (fst $1, Arabica.Abs.ELitInt (fst $1) (snd $1)) }
+      | 'true' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.ELitTrue (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | 'false' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.ELitFalse (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | Ident '(' ListExpr ')' { (fst $1, Arabica.Abs.EApp (fst $1) (snd $1) (snd $3)) }
+      | String { (fst $1, Arabica.Abs.EString (fst $1) (snd $1)) }
+      | Expr7 { (fst $1, (snd $1)) }
 
-Expr5 :: { Arabica.Abs.Expr }
-Expr5 : '-' Expr6 { Arabica.Abs.Neg $2 }
-      | '!' Expr6 { Arabica.Abs.Not $2 }
-      | Expr6 { $1 }
+Expr5 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr5 : '-' Expr6 { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Neg (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2)) }
+      | '!' Expr6 { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Not (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1)) (snd $2)) }
+      | Expr6 { (fst $1, (snd $1)) }
 
-Expr4 :: { Arabica.Abs.Expr }
-Expr4 : Expr4 MulOp Expr5 { Arabica.Abs.EMul $1 $2 $3 }
-      | Expr5 { $1 }
+Expr4 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr4 : Expr4 MulOp Expr5 { (fst $1, Arabica.Abs.EMul (fst $1) (snd $1) (snd $2) (snd $3)) }
+      | Expr5 { (fst $1, (snd $1)) }
 
-Expr3 :: { Arabica.Abs.Expr }
-Expr3 : Expr3 AddOp Expr4 { Arabica.Abs.EAdd $1 $2 $3 }
-      | Expr4 { $1 }
+Expr3 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr3 : Expr3 AddOp Expr4 { (fst $1, Arabica.Abs.EAdd (fst $1) (snd $1) (snd $2) (snd $3)) }
+      | Expr4 { (fst $1, (snd $1)) }
 
-Expr2 :: { Arabica.Abs.Expr }
-Expr2 : Expr2 RelOp Expr3 { Arabica.Abs.ERel $1 $2 $3 }
-      | Expr3 { $1 }
+Expr2 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr2 : Expr2 RelOp Expr3 { (fst $1, Arabica.Abs.ERel (fst $1) (snd $1) (snd $2) (snd $3)) }
+      | Expr3 { (fst $1, (snd $1)) }
 
-Expr1 :: { Arabica.Abs.Expr }
-Expr1 : Expr2 '&&' Expr1 { Arabica.Abs.EAnd $1 $3 } | Expr2 { $1 }
+Expr1 :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr1 : Expr2 '&&' Expr1 { (fst $1, Arabica.Abs.EAnd (fst $1) (snd $1) (snd $3)) }
+      | Expr2 { (fst $1, (snd $1)) }
 
-Expr :: { Arabica.Abs.Expr }
-Expr : Expr1 '||' Expr { Arabica.Abs.EOr $1 $3 } | Expr1 { $1 }
+Expr :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.Expr) }
+Expr : Expr1 '||' Expr { (fst $1, Arabica.Abs.EOr (fst $1) (snd $1) (snd $3)) }
+     | Expr1 { (fst $1, (snd $1)) }
 
-ListExpr :: { [Arabica.Abs.Expr] }
-ListExpr : {- empty -} { [] }
-         | Expr { (:[]) $1 }
-         | Expr ',' ListExpr { (:) $1 $3 }
+ListExpr :: { (Arabica.Abs.BNFC'Position, [Arabica.Abs.Expr]) }
+ListExpr : {- empty -} { (Arabica.Abs.BNFC'NoPosition, []) }
+         | Expr { (fst $1, (:[]) (snd $1)) }
+         | Expr ',' ListExpr { (fst $1, (:) (snd $1) (snd $3)) }
 
-AddOp :: { Arabica.Abs.AddOp }
-AddOp : '+' { Arabica.Abs.Plus } | '-' { Arabica.Abs.Minus }
+AddOp :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.AddOp) }
+AddOp : '+' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Plus (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | '-' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Minus (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
 
-MulOp :: { Arabica.Abs.MulOp }
-MulOp : '*' { Arabica.Abs.Times } | '/' { Arabica.Abs.Div }
+MulOp :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.MulOp) }
+MulOp : '*' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Times (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | '/' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.Div (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
 
-RelOp :: { Arabica.Abs.RelOp }
-RelOp : '<' { Arabica.Abs.LTH }
-      | '<=' { Arabica.Abs.LE }
-      | '>' { Arabica.Abs.GTH }
-      | '>=' { Arabica.Abs.GE }
-      | '==' { Arabica.Abs.EQU }
-      | '!=' { Arabica.Abs.NE }
+RelOp :: { (Arabica.Abs.BNFC'Position, Arabica.Abs.RelOp) }
+RelOp : '<' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.LTH (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | '<=' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.LE (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | '>' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.GTH (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | '>=' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.GE (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | '==' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.EQU (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
+      | '!=' { (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1), Arabica.Abs.NE (uncurry Arabica.Abs.BNFC'Position (tokenLineCol $1))) }
 {
 
 type Err = Either String
@@ -215,5 +222,9 @@ happyError ts = Left $
 myLexer :: String -> [Token]
 myLexer = tokens
 
+-- Entrypoints
+
+pProgram :: [Token] -> Err Arabica.Abs.Program
+pProgram = fmap snd . pProgram_internal
 }
 

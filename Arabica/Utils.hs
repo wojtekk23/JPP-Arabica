@@ -28,7 +28,20 @@ errorMessage e = lift $ lift $ throwE e
 debugMessage :: String -> Arabica.Abs.InterpretingMonadIO ()
 debugMessage s = lift $ lift $ lift $ putStrLn s
 
-defaultVal :: Arabica.Abs.Type -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.LocVal
+transType :: Show a => Arabica.Abs.Type' a -> Arabica.Abs.AbsType
+transType x = case x of
+  Arabica.Abs.IntType _ -> Arabica.Abs.Int
+  Arabica.Abs.StrTpye _ -> Arabica.Abs.Str
+  Arabica.Abs.BoolType _ -> Arabica.Abs.Bool
+  Arabica.Abs.VoidType _ -> Arabica.Abs.Void
+  Arabica.Abs.FunType _ type_ types -> Arabica.Abs.Fun (transType type_) $ map transType types
+  Arabica.Abs.ArrayType _ type_ -> Arabica.Abs.Array (transType type_)
+
+transArg :: Show a => Arabica.Abs.Arg' a -> Arabica.Abs.AbsArg
+transArg x = case x of
+  Arabica.Abs.Arg _ type_ ident -> Arabica.Abs.AbsArg (transType type_) ident
+
+defaultVal :: Arabica.Abs.AbsType -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.LocVal
 defaultVal type_ = case type_ of
   Arabica.Abs.Int -> pure $ Arabica.Abs.IntegerVal 0
   Arabica.Abs.Str -> pure $ Arabica.Abs.StringVal ""
@@ -36,13 +49,13 @@ defaultVal type_ = case type_ of
   Arabica.Abs.Array arrType -> pure $ Arabica.Abs.ArrVal arrType (array (0,0) [])
   _ -> failure "Na razie domyślne wartości mają inty, stringi, boole i tablice"
 
-conformValType :: Arabica.Abs.LocVal -> Arabica.Abs.Type -> Bool
+conformValType :: Arabica.Abs.LocVal -> Arabica.Abs.AbsType -> Bool
 conformValType (Arabica.Abs.IntegerVal _) Arabica.Abs.Int = True
 conformValType (Arabica.Abs.BoolVal _) Arabica.Abs.Bool = True
 conformValType (Arabica.Abs.StringVal _) Arabica.Abs.Str = True
 conformValType Arabica.Abs.VoidVal Arabica.Abs.Void = True
 conformValType (Arabica.Abs.FunVal valType args _ _) (Arabica.Abs.Fun funType argTypes) = 
-  let leftTypes = map (\(Arabica.Abs.Arg type_ _) -> type_) args in 
+  let leftTypes = map (\(Arabica.Abs.AbsArg type_ _) -> type_) args in 
     (valType == funType) && (all (uncurry $ (==)) (zip leftTypes argTypes))
 conformValType (Arabica.Abs.ArrVal arrType _) (Arabica.Abs.Array type_) = arrType == type_
 conformValType _ _ = False

@@ -1,4 +1,5 @@
 // Break - dwie pętle wewnątrz siebie
+// break kończy tylko najbliższą pętlę
 
 int main() {
     int x = 0, y = 0;

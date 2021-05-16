@@ -1,4 +1,5 @@
 // Podstawowy break
+// Skończy się przy x==10
 
 int main() {
     int x = 0;
