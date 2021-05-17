@@ -22,7 +22,7 @@ import Arabica.Lex   ( Token )
 import Arabica.Par   ( pProgram, myLexer )
 import Arabica.Print ( Print, printTree )
 import Arabica.Skel  ( transProgram )
--- import Arabica.TypeCheck
+import Arabica.TypeCheck
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
 import qualified Data.Map as M
@@ -92,25 +92,25 @@ runProgram v p s =
   where
   ts = myLexer s
 
--- runTypeCheck :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
--- runTypeCheck v p s = 
---   case p ts of
---     Left err -> do
---       putStrLn "\nParse              Failed...\n"
---       putStrV v "Tokens:"
---       putStrV v $ show ts
---       putStrLn err
---       exitFailure
---     Right tree -> do
---       putStrLn "\nParse Successful!"
---       -- showTree v tree
---       typeState <- runExceptT $ runReaderT (typeCheckProgram tree) M.empty
---       case typeState of
---         Left e -> putStrLn $ show e
---         Right _ -> putStrLn $ show "Typ ok"
---       exitSuccess
---   where
---   ts = myLexer s
+runTypeCheck :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
+runTypeCheck v p s = 
+  case p ts of
+    Left err -> do
+      putStrLn "\nParse              Failed...\n"
+      putStrV v "Tokens:"
+      putStrV v $ show ts
+      putStrLn err
+      exitFailure
+    Right tree -> do
+      putStrLn "\nParse Successful!"
+      -- showTree v tree
+      typeState <- runExceptT $ runReaderT (typeCheckProgram tree) M.empty
+      case typeState of
+        Left e -> putStrLn $ show e
+        Right _ -> putStrLn $ show "Typ ok"
+      exitSuccess
+  where
+  ts = myLexer s
 
 showTree :: (Show a, Print a) => Int -> a -> IO ()
 showTree v tree = do
@@ -134,7 +134,7 @@ main = do
   case args of
     ["--help"] -> usage
     ["--tree"] -> getContents >>= run 2 pProgram
-    -- ["--type"] -> getContents >>= runTypeCheck 2 pProgram
+    ["--type"] -> getContents >>= runTypeCheck 2 pProgram
     []         -> getContents >>= runProgram 2 pProgram
     "-s":fs    -> mapM_ (runFile 0 pProgram) fs
     fs         -> mapM_ (runFile 2 pProgram) fs
