@@ -128,8 +128,8 @@ transStmt inLoop x = case x of
               else errorMessage $ Arabica.Abs.ArrayAssignMismatch p ident
           _ -> errorMessage $ Arabica.Abs.IndexNotInteger p ident
       _ -> errorMessage $ Arabica.Abs.NotAnArray p ident
-  Arabica.Abs.Incr _ ident -> failure "Incr"
-  Arabica.Abs.Decr _ ident -> failure "Decr"
+  Arabica.Abs.Incr p ident -> changeByOne 1 p ident
+  Arabica.Abs.Decr p ident -> changeByOne (-1) p ident
   Arabica.Abs.Ret _ expr -> do
     retVal <- transExpr expr
     varEnv <- ask
