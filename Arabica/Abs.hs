@@ -154,7 +154,7 @@ data Exception
   deriving (C.Eq, C.Show)
 
 data TypeCheckingError
-    = CustomTypeError String
+    = CustomTypeError BNFC'Position String
   deriving (C.Eq, C.Show)
 
 type ReturnVal = Maybe LocVal

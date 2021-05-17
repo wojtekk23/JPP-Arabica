@@ -99,6 +99,11 @@ runProgram v p s =
   where
   ts = myLexer s
 
+getTypeErrorMessage :: Arabica.Abs.TypeCheckingError -> String
+getTypeErrorMessage typeError = 
+  case typeError of
+    Arabica.Abs.CustomTypeError p s -> addPositionToExceptionMessage p s
+
 runTypeCheck :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
 runTypeCheck v p s = 
   case p ts of
@@ -113,7 +118,7 @@ runTypeCheck v p s =
       -- showTree v tree
       typeState <- runExceptT $ runReaderT (typeCheckProgram tree) M.empty
       case typeState of
-        Left e -> putStrLn $ show e
+        Left e -> putStrLn $ getTypeErrorMessage e
         Right _ -> putStrLn $ show "Typ ok"
       exitSuccess
   where
