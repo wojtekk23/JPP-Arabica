@@ -138,19 +138,19 @@ type Location = Integer
 
 data Exception 
     = StringError String
-    | DivisionByZero
-    | NoLocation Ident
-    | IncorrectValue Ident Integer
-    | IndexOutOfBounds Integer (Integer, Integer) Ident
-    | ArrayAssignMismatch Ident
-    | IndexNotInteger Ident
-    | NotAnArray Ident
-    | TooManyArgs Ident
-    | NotEnoughArgs Ident
-    | NoValueReturned Ident AbsType
-    | WrongValueReturned Ident AbsType AbsType
-    | NotAFunction Ident
-    | ReadOnlyVariable Ident
+    | DivisionByZero BNFC'Position
+    | NoLocation BNFC'Position Ident
+    | IncorrectValue BNFC'Position Ident Integer
+    | IndexOutOfBounds BNFC'Position Integer (Integer, Integer) Ident
+    | ArrayAssignMismatch BNFC'Position Ident
+    | IndexNotInteger BNFC'Position Ident
+    | NotAnArray BNFC'Position Ident
+    | TooManyArgs BNFC'Position Ident
+    | NotEnoughArgs BNFC'Position Ident
+    | NoValueReturned BNFC'Position Ident AbsType
+    | WrongValueReturned BNFC'Position Ident AbsType AbsType
+    | NotAFunction BNFC'Position Ident
+    | ReadOnlyVariable BNFC'Position Ident
   deriving (C.Eq, C.Show)
 
 data TypeCheckingError

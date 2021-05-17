@@ -19,48 +19,48 @@ newVariable readOnly x val = do
   put $ (M.insert loc val locEnv, loc+1)
   pure $ M.insert x (loc, readOnly) varEnv
 
-updateVariable :: Arabica.Abs.Ident -> Arabica.Abs.LocVal -> Arabica.Abs.InterpretingMonadIO ()
-updateVariable x val = do
+updateVariable :: Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> Arabica.Abs.LocVal -> Arabica.Abs.InterpretingMonadIO ()
+updateVariable p x val = do
   varEnv <- ask
   (locEnv, lastLoc) <- get
   let addr = M.lookup x varEnv
   case addr of
-    Nothing -> errorMessage $ Arabica.Abs.NoLocation x
+    Nothing -> errorMessage $ Arabica.Abs.NoLocation p x
     Just (loc, readOnly) -> do
       if readOnly then do
-        errorMessage $ Arabica.Abs.ReadOnlyVariable x
+        errorMessage $ Arabica.Abs.ReadOnlyVariable p x
       else do put $ (M.insert loc val locEnv, lastLoc)
 
-updateForVariable :: Arabica.Abs.Ident -> Arabica.Abs.LocVal -> Arabica.Abs.InterpretingMonadIO ()
-updateForVariable x val = do
+updateForVariable :: Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> Arabica.Abs.LocVal -> Arabica.Abs.InterpretingMonadIO ()
+updateForVariable p x val = do
   varEnv <- ask
   (locEnv, lastLoc) <- get
   let addr = M.lookup x varEnv
   case addr of
-    Nothing -> errorMessage $ Arabica.Abs.NoLocation x
+    Nothing -> errorMessage $ Arabica.Abs.NoLocation p x
     Just (loc, readOnly) -> do
       if readOnly then do
         put $ (M.insert loc val locEnv, lastLoc)
       else do failure "updateForVariable for NOT read-only variable"    
 
-readVariable :: Arabica.Abs.Ident -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.LocVal
-readVariable x = do
+readVariable :: Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.LocVal
+readVariable p x = do
   varEnv <- ask
   (locEnv, _) <- get
   let addr = M.lookup x varEnv
   case addr of
-    Nothing -> errorMessage $ Arabica.Abs.NoLocation x
+    Nothing -> errorMessage $ Arabica.Abs.NoLocation p x
     Just (loc, _) -> do
       let maybeVal = M.lookup loc locEnv
       case maybeVal of
-        Nothing -> errorMessage $ Arabica.Abs.IncorrectValue x loc
+        Nothing -> errorMessage $ Arabica.Abs.IncorrectValue p x loc
         Just val -> pure val
 
-getClosureFromCurrentEnvironment :: Arabica.Abs.VarEnv -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.Closure
-getClosureFromCurrentEnvironment varEnv = do
+getClosureFromCurrentEnvironment :: Arabica.Abs.BNFC'Position -> Arabica.Abs.VarEnv -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.Closure
+getClosureFromCurrentEnvironment p varEnv = do
   let varKeys = M.keys varEnv
   -- debugMessage $ unwords ["varKeys:", show varKeys]
-  varVals <- mapM readVariable varKeys
+  varVals <- mapM (readVariable p) varKeys
   -- debugMessage $ unwords ["varVals:", show varVals]
   pure $ M.fromList $ zip varKeys varVals
 
