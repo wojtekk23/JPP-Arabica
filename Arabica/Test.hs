@@ -69,6 +69,7 @@ getExceptionMessage exception =
     Arabica.Abs.NoValueReturned ident type_ -> unwords ["Function", show ident, "should return", show type_, "but returns nothing"]
     Arabica.Abs.NotAFunction ident -> unwords ["Identifier", show ident, "is not a function"]
     Arabica.Abs.DivisionByZero -> "Division by 0"
+    Arabica.Abs.WrongValueReturned ident type1 type2 -> unwords ["Function", show ident, "should return", show type1, "but returns", show type2]
     Arabica.Abs.StringError s -> s
 
 runProgram :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()

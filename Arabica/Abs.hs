@@ -148,6 +148,7 @@ data Exception
     | TooManyArgs Ident
     | NotEnoughArgs Ident
     | NoValueReturned Ident AbsType
+    | WrongValueReturned Ident AbsType AbsType
     | NotAFunction Ident
     | ReadOnlyVariable Ident
   deriving (C.Eq, C.Show)

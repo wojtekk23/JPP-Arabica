@@ -59,7 +59,9 @@ readVariable x = do
 getClosureFromCurrentEnvironment :: Arabica.Abs.VarEnv -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.Closure
 getClosureFromCurrentEnvironment varEnv = do
   let varKeys = M.keys varEnv
+  -- debugMessage $ unwords ["varKeys:", show varKeys]
   varVals <- mapM readVariable varKeys
+  -- debugMessage $ unwords ["varVals:", show varVals]
   pure $ M.fromList $ zip varKeys varVals
 
 assignClosureToVals :: Arabica.Abs.Closure -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv

@@ -60,6 +60,15 @@ conformValType (Arabica.Abs.FunVal valType args _ _) (Arabica.Abs.Fun funType ar
 conformValType (Arabica.Abs.ArrVal arrType _) (Arabica.Abs.Array type_) = arrType == type_
 conformValType _ _ = False
 
+getTypeFromVal :: Arabica.Abs.LocVal -> Arabica.Abs.AbsType
+getTypeFromVal x = case x of
+  Arabica.Abs.BoolVal _ -> Arabica.Abs.Bool
+  Arabica.Abs.IntegerVal _ -> Arabica.Abs.Int
+  Arabica.Abs.StringVal _ -> Arabica.Abs.Str
+  Arabica.Abs.VoidVal -> Arabica.Abs.Void
+  Arabica.Abs.FunVal retType absArgs _ _ -> Arabica.Abs.Fun retType $ map (\(Arabica.Abs.AbsArg argType _) -> argType) absArgs
+  Arabica.Abs.ArrVal arrType _ -> Arabica.Abs.Array arrType
+
 normalPass :: Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
 normalPass = do
   varEnv <- ask

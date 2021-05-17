@@ -58,9 +58,14 @@ transTopDef x = case x of
     currEnv <- ask
     closure <- getClosureFromCurrentEnvironment currEnv
     newVarEnv <- newVariable False ident (Arabica.Abs.FunVal absType absArgs block closure)
-    if str == "main" then  do
+    if str == "main" then do
       (newestEnv, newestReturn, _) <- local (const newVarEnv) $ transBlock False block
-      pure $ (newestEnv, newestReturn)
+
+      case newestReturn of
+        Just y -> case y of
+          Arabica.Abs.IntegerVal _ -> pure $ (newestEnv, newestReturn)
+          z -> errorMessage $ Arabica.Abs.WrongValueReturned ident absType $ getTypeFromVal z
+        Nothing -> errorMessage $ Arabica.Abs.NoValueReturned ident absType
     else pure $ (newVarEnv, Nothing)
 
 transBlock :: Bool -> Arabica.Abs.Block -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
@@ -247,7 +252,8 @@ transExpr x = case x of
       Arabica.Abs.FunVal type_ args block closure -> do
         -- TODO: przyzwala na pozyskiwanie zmiennych z środowiska funkcji wywołującej, trzeba to zmienić
         -- i dodać rozróżnienie na funkcje i lambdy (ewentulanie dodać do FunVal środowisko)
-        oldFunVarEnv <- local (const varEnv) $ assignClosureToVals closure
+        oldFunVarEnv <- local (const M.empty) $ assignClosureToVals closure
+        -- debugMessage $ unwords ["oldFunVarEnv:", show oldFunVarEnv]
         funVarEnv <- local (const oldFunVarEnv) $ assignArgsToVals ident exprs args
         -- testtest <- getClosureFromCurrentEnvironment funVarEnv
         -- let funVarEnv = oldfunVarEnv
@@ -255,6 +261,7 @@ transExpr x = case x of
         -- debugMessage $ unwords ["apply function with state", show currState]
         (_, retVal, _) <- local (const funVarEnv) $ transBlock False block
         case retVal of
+          -- TODO: zrób typecheck zwracanej wartości. Wiem, że jest w typecheckingu, ale bądźmi poważni
           Just x -> pure x
           Nothing -> do
             case type_ of
