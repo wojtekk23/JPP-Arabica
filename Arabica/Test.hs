@@ -100,9 +100,32 @@ runProgram v p s =
   ts = myLexer s
 
 getTypeErrorMessage :: Arabica.Abs.TypeCheckingError -> String
-getTypeErrorMessage typeError = 
-  case typeError of
-    Arabica.Abs.CustomTypeError p s -> addPositionToExceptionMessage p s
+getTypeErrorMessage typeError = addPositionToExceptionMessage (Arabica.Abs.hasPosition typeError) s
+  where
+    s = case typeError of
+      Arabica.Abs.CustomTypeError _ s -> s
+      Arabica.Abs.WrongMainTypeError _ -> "Main function should have a return type int and take no arguments"
+      Arabica.Abs.WrongInitType p ident type1 type2 -> unwords ["Variable", show ident, "is of type", show type1, "but was initialized with type", show type2]
+      Arabica.Abs.NoIdentifierFound p ident -> unwords ["No identifier", show ident, "was found"]
+      Arabica.Abs.ExpressionVariableMismatch p ident -> unwords ["Type of an expression and type of variable", show ident, "mismatch"]
+      Arabica.Abs.ExpressionArrayMismatch p ident -> unwords ["Type of an expression and type of an array", show ident, "mismatch"]
+      Arabica.Abs.NonIntegerIndex p ident -> unwords ["Array", show ident, "can only be accessed with an integer"]
+      Arabica.Abs.NotAnArrayType p ident -> unwords ["Variable", show ident, "is not an array and cannot be indexed"]
+      Arabica.Abs.IncrementNonInteger p ident -> unwords ["Variable", show ident, "cannot be incremented because it is not an integer"]
+      Arabica.Abs.DecrementNonInteger p ident -> unwords ["Variable", show ident, "cannot be decremented because it is not an integer"]
+      Arabica.Abs.WrongReturnType p type1 type2 -> unwords ["Function is of type", show type1, "but it contains a statement returning type", show type2]
+      Arabica.Abs.WrongVoidReturn p type_ -> unwords ["Function is of type", show type_, "but it contains a void return statement"]
+      Arabica.Abs.WrongConditionType p condType -> unwords ["Condition is of type", show condType, "but it has to be either a boolean or integer value"]
+      Arabica.Abs.WrongForBeginType p -> unwords ["Begin expression in for loop should be of type int"]
+      Arabica.Abs.WrongForEndType p -> unwords ["End expression in for loop should be of type int"]
+      Arabica.Abs.TooManyArgsType p ident -> unwords ["Too many arguments given to a function", show ident]
+      Arabica.Abs.NotEnoughArgsType p ident -> unwords ["Not enough arguments given to a function", show ident]
+      Arabica.Abs.FunArgumentTypeMismatch p num ident exprType argType -> unwords ["Argument", show num, "given to a function", show ident, "is of type", show exprType, "but should be of type", show argType]
+      Arabica.Abs.NotAFunctionType p ident -> unwords ["Variable", show ident, "is not a function"]
+      Arabica.Abs.ArithNegationType p type_ -> unwords ["Tried to negate expression of type", show type_, "but it should be an integer"]
+      Arabica.Abs.LogicNegationType p type_ -> unwords ["Tried to apply logical not to an expression of type", show type_, "but it should be a boolean"]
+      Arabica.Abs.FirstOperandShouldBeType p type1 type2 -> unwords ["First operand of expression should be of type", show type1, "but is of type", show type2]
+      Arabica.Abs.SecondOperandShouldBeType p type1 type2 -> unwords ["Second operand of expression should be of type", show type1, "but is of type", show type2]
 
 runTypeCheck :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
 runTypeCheck v p s = 

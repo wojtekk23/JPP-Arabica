@@ -1,0 +1,8 @@
+// W negacji arytmetycznej można używać tylko liczby
+
+int main() {
+    string x = "test";
+    int y = -x;
+
+    return 0;
+}

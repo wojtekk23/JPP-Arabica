@@ -13,7 +13,7 @@ module Arabica.Abs where
 
 import Prelude (Integer, String, Bool, Maybe, IO)
 import qualified Prelude as C
-  ( Eq, Ord, Show, Read
+  ( Eq, Ord, Show(..), Read
   , Functor, Foldable, Traversable
   , Int, Maybe(..)
   )
@@ -121,7 +121,10 @@ data RelOp' a = LTH a | LE a | GTH a | GE a | EQU a | NE a
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 newtype Ident = Ident String
-  deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
+  deriving (C.Eq, C.Ord, C.Read, Data.String.IsString)
+
+instance C.Show Ident where
+  show (Ident str) = C.show str
 
 type VarEnv = M.Map Ident (Location, Bool)
 type LocEnv = M.Map Location LocVal
@@ -155,6 +158,28 @@ data Exception
 
 data TypeCheckingError
     = CustomTypeError BNFC'Position String
+    | WrongMainTypeError BNFC'Position
+    | WrongInitType BNFC'Position Ident AbsType AbsType
+    | NoIdentifierFound BNFC'Position Ident
+    | ExpressionVariableMismatch BNFC'Position Ident
+    | ExpressionArrayMismatch BNFC'Position Ident
+    | NonIntegerIndex BNFC'Position Ident
+    | NotAnArrayType BNFC'Position Ident
+    | IncrementNonInteger BNFC'Position Ident
+    | DecrementNonInteger BNFC'Position Ident
+    | WrongReturnType BNFC'Position AbsType AbsType
+    | WrongVoidReturn BNFC'Position AbsType
+    | WrongConditionType BNFC'Position AbsType
+    | WrongForBeginType BNFC'Position
+    | WrongForEndType BNFC'Position
+    | TooManyArgsType BNFC'Position Ident
+    | NotEnoughArgsType BNFC'Position Ident
+    | FunArgumentTypeMismatch BNFC'Position Integer Ident AbsType AbsType
+    | NotAFunctionType BNFC'Position Ident
+    | ArithNegationType BNFC'Position AbsType
+    | LogicNegationType BNFC'Position AbsType
+    | FirstOperandShouldBeType BNFC'Position AbsType AbsType
+    | SecondOperandShouldBeType BNFC'Position AbsType AbsType
   deriving (C.Eq, C.Show)
 
 type ReturnVal = Maybe LocVal
@@ -269,4 +294,30 @@ instance HasPosition RelOp where
     GE p -> p
     EQU p -> p
     NE p -> p
+
+instance HasPosition TypeCheckingError where
+  hasPosition = \case
+    CustomTypeError p _ -> p
+    WrongMainTypeError p -> p
+    WrongInitType p _ _ _ -> p
+    NoIdentifierFound p _ -> p
+    ExpressionVariableMismatch p _ -> p
+    ExpressionArrayMismatch p _ -> p
+    NonIntegerIndex p _ -> p
+    NotAnArrayType p _ -> p
+    IncrementNonInteger p _ -> p
+    DecrementNonInteger p _ -> p
+    WrongReturnType p _ _ -> p
+    WrongVoidReturn p _ -> p
+    WrongConditionType p _ -> p
+    WrongForBeginType p -> p
+    WrongForEndType p -> p
+    TooManyArgsType p _ -> p
+    NotEnoughArgsType p _ -> p
+    FunArgumentTypeMismatch p _ _ _ _ -> p
+    NotAFunctionType p _ -> p
+    ArithNegationType p _ -> p
+    LogicNegationType p _ -> p
+    FirstOperandShouldBeType p _ _ -> p
+    SecondOperandShouldBeType p _ _ -> p
 

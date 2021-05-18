@@ -1,0 +1,7 @@
+// Zły typ pierwszego wyrażenia w operacji arytmetycznej
+
+int main() {
+    int x = "two" + 5;
+
+    return 0;
+}

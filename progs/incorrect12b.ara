@@ -1,0 +1,11 @@
+// Zły typ w warunku pętli while
+
+int main() {
+    string x = "true";
+
+    while (x) {
+        print("TRUE");
+    }
+
+    return 0;
+}

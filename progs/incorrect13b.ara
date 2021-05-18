@@ -1,0 +1,11 @@
+// Zły typ pierwszej wartości w pętli for
+
+int main() {
+    string twenty = "twenty";
+
+    for x = 1 to twenty do {
+        print(x);
+    }
+
+    return 0;
+}

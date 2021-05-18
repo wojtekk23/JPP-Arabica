@@ -19,6 +19,9 @@ getLambdaType (Arabica.Abs.ELambda _ type_ args block) = do
 typeError :: Show a => Arabica.Abs.BNFC'Position -> a -> Arabica.Abs.TypeCheckingMonadIO b
 typeError p x = lift $ throwE $ Arabica.Abs.CustomTypeError p $ show x
 
+throwTypeError :: Arabica.Abs.TypeCheckingError -> Arabica.Abs.TypeCheckingMonadIO b
+throwTypeError x = lift $ throwE $ x
+
 typeCheckProgram :: Arabica.Abs.Program -> Arabica.Abs.TypeCheckingMonadIO ()
 typeCheckProgram x = case x of
   Arabica.Abs.Program _ topdefs -> do
@@ -39,7 +42,7 @@ typeTopDef x = case x of
     let absType = transType type_
     let absArgs = map transArg args
     if name == "main" && (absType /= Arabica.Abs.Int || length absArgs /= 0) then do
-      typeError p $ unwords ["Main function should have a return type int and take no arguments"]
+      throwTypeError $ Arabica.Abs.WrongMainTypeError p
     else do
       typeEnv <- ask
       topDefType <- getTopDefType x
@@ -63,7 +66,7 @@ typeItem itemType x = case x of
   Arabica.Abs.Init p ident expr -> do
     exprType <- typeExpr expr
     if exprType == itemType then pure ident
-    else typeError p $ unwords ["Variable", show ident, "is of type", show itemType, "but was initialized with type", show exprType]
+    else throwTypeError $ Arabica.Abs.WrongInitType p ident itemType exprType
 
 typeStmts :: Arabica.Abs.AbsType -> Arabica.Abs.Stmt -> Arabica.Abs.TypeCheckingMonadIO Arabica.Abs.TypeEnv
 typeStmts fnType x = case x of
@@ -81,16 +84,16 @@ typeStmts fnType x = case x of
     typeEnv <- ask
     let maybeVar = M.lookup ident typeEnv
     case maybeVar of
-      Nothing -> typeError p $ unwords ["No identifier", "\"" ++ show ident ++ "\"", "was found"]
+      Nothing -> throwTypeError $ Arabica.Abs.NoIdentifierFound p ident
       Just varType -> do
         exprType <- typeExpr expr
         if exprType == varType then ask
-        else typeError p $ unwords ["Type of an expression", show expr, "and type of variable", show ident, "do not match"]
+        else throwTypeError $ Arabica.Abs.ExpressionVariableMismatch p ident
   Arabica.Abs.ArrAss p ident indexExpr valExpr -> do
     typeEnv <- ask
     let maybeArr = M.lookup ident typeEnv
     case maybeArr of
-      Nothing -> typeError p $ unwords ["No identifier", "\"" ++ show ident ++ "\"", "was found"]
+      Nothing -> throwTypeError $ Arabica.Abs.NoIdentifierFound p ident
       Just arrType -> case arrType of
         Arabica.Abs.Array arrType -> do
           indexType <- typeExpr indexExpr
@@ -98,32 +101,32 @@ typeStmts fnType x = case x of
             Arabica.Abs.Int -> do
               valType <- typeExpr valExpr
               if valType == arrType then ask
-              else typeError p $ unwords ["Type of an expression", show valExpr, "and type of array", show ident, "do not match"]
-            _ -> typeError p $ unwords ["Array", "\"" ++ show ident ++ "\"", "can only be accessed with an integer"]
-        _ -> typeError p $ unwords ["Variable", "\"" ++ show ident ++ "\"", "is not an array"]
+              else throwTypeError $ Arabica.Abs.ExpressionArrayMismatch p ident
+            _ -> throwTypeError $ Arabica.Abs.NonIntegerIndex p ident
+        _ -> throwTypeError $ Arabica.Abs.NotAnArrayType p ident
   Arabica.Abs.Incr p ident -> do
     valType <- typeExpr $ Arabica.Abs.EVar p ident
     case valType of
       Arabica.Abs.Int -> ask
-      _ -> typeError p $ unwords ["Variable", show x, "cannot be incremented because it is not an integer"]
+      _ -> throwTypeError $ Arabica.Abs.IncrementNonInteger p ident
   Arabica.Abs.Decr p ident -> do
     valType <- typeExpr $ Arabica.Abs.EVar p ident
     case valType of
       Arabica.Abs.Int -> ask
-      _ -> typeError p $ unwords ["Variable", show x, "cannot be decremented because it is not an integer"]
+      _ -> throwTypeError $ Arabica.Abs.DecrementNonInteger p ident
   Arabica.Abs.Ret p expr -> do
     exprType <- typeExpr expr
     if exprType == fnType then ask
-    else typeError p $ unwords ["Function is of type", show fnType, "but it contains a statement returning type", show exprType]
+    else throwTypeError $ Arabica.Abs.WrongReturnType p fnType exprType
   Arabica.Abs.VRet p -> do
     if fnType == Arabica.Abs.Void then ask
-    else typeError p $ unwords ["Function is of type", show fnType, "but it contains a void return statement"]
+    else throwTypeError $ Arabica.Abs.WrongVoidReturn p fnType
   -- Chyba nie powinniśmy przypisywać Arabica.Abs.Empty takiej pozycji :/
   Arabica.Abs.Cond p expr stmt -> typeStmts fnType $ Arabica.Abs.CondElse p expr stmt $ Arabica.Abs.Empty p
   Arabica.Abs.CondElse p expr stmt1 stmt2 -> do
     condType <- typeExpr expr
     if condType /= Arabica.Abs.Bool && condType /= Arabica.Abs.Int then
-      typeError p $ unwords ["Condition is of type", show condType, "but it has to either a boolean or integer value"]
+      throwTypeError $ Arabica.Abs.WrongConditionType p condType
     else do
       typeStmts fnType stmt1
       typeStmts fnType stmt2
@@ -131,7 +134,7 @@ typeStmts fnType x = case x of
   Arabica.Abs.While p expr stmt -> do
     condType <- typeExpr expr
     if condType /= Arabica.Abs.Bool && condType /= Arabica.Abs.Int then
-      typeError p $ unwords ["Condition is of type", show condType, "but it has to either a boolean or integer value"]
+      throwTypeError $ Arabica.Abs.WrongConditionType p condType
     else do
       typeStmts fnType stmt
       ask
@@ -149,18 +152,18 @@ typeStmts fnType x = case x of
           Arabica.Abs.Int -> do
             local (M.insert ident Arabica.Abs.Int) $ typeStmts fnType stmt
             ask
-          _ -> typeError p $ unwords ["End expression in for loop should be of type Int"]
-      _ -> typeError p $ unwords ["Begin expression in for loop should be of type Int"]
+          _ -> throwTypeError $ Arabica.Abs.WrongForBeginType p
+      _ -> throwTypeError $ Arabica.Abs.WrongForEndType p
   Arabica.Abs.Print _ expr -> do
     typeExpr expr
     ask
 
 confirmTypes :: Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> Integer -> [Arabica.Abs.AbsType] -> [Arabica.Abs.AbsType] -> Arabica.Abs.TypeCheckingMonadIO ()
 confirmTypes _ _ _ [] [] = pure ()
-confirmTypes p ident _ _ [] = typeError p $ unwords ["Too many arguments given to a function", show ident]
-confirmTypes p ident _ [] _ = typeError p $ unwords ["Not enough arguments given to a function", show ident]
+confirmTypes p ident _ _ [] = throwTypeError $ Arabica.Abs.TooManyArgsType p ident
+confirmTypes p ident _ [] _ = throwTypeError $ Arabica.Abs.NotEnoughArgsType p ident
 confirmTypes p ident num (exprType:exprs) (argType:args) = do
-  if exprType /= argType then typeError p $ unwords ["Argument", show num, "given to a function", show ident, "is of type", show exprType, "but should be of type", show argType]
+  if exprType /= argType then throwTypeError $ Arabica.Abs.FunArgumentTypeMismatch p num ident exprType argType
   else confirmTypes p ident (num+1) exprs args
 
 typeExpr :: Arabica.Abs.Expr -> Arabica.Abs.TypeCheckingMonadIO Arabica.Abs.AbsType
@@ -170,15 +173,15 @@ typeExpr x = case x of
     typeEnv <- ask
     let maybeArrType = M.lookup ident typeEnv
     case maybeArrType of
-      Nothing -> typeError p $ unwords ["No identifier", show ident, "was found"]
+      Nothing -> throwTypeError $ Arabica.Abs.NoIdentifierFound p ident
       Just arrType -> do
         case arrType of
           Arabica.Abs.Array elemType -> do
             ixType <- typeExpr expr
             case ixType of
               Arabica.Abs.Int -> pure elemType
-              _ -> typeError p $ unwords ["Arrays must be indexed with an integer"]
-          _ -> typeError p $ unwords ["Variable", show ident, "is not an array"]
+              _ -> throwTypeError $ Arabica.Abs.NonIntegerIndex p ident
+          _ -> throwTypeError $ Arabica.Abs.NotAnArrayType p ident
   Arabica.Abs.ELambda _ type_ args block -> do
     typeEnv <- ask
     let absType = transType type_
@@ -189,7 +192,7 @@ typeExpr x = case x of
     typeEnv <- ask
     let maybeType = M.lookup ident typeEnv
     case maybeType of
-      Nothing -> typeError p $ unwords ["No identifier", "\"" ++ show ident ++ "\"", "was found"]
+      Nothing -> throwTypeError $ Arabica.Abs.NoIdentifierFound p ident
       Just type_ -> pure type_
   Arabica.Abs.ELitInt _ integer -> pure $ Arabica.Abs.Int
   Arabica.Abs.ELitTrue _ -> pure $ Arabica.Abs.Bool
@@ -199,23 +202,23 @@ typeExpr x = case x of
     -- lift $ lift $ putStrLn $ show typeEnv
     let maybeVarType = M.lookup ident typeEnv
     case maybeVarType of
-      Nothing -> typeError p $ unwords ["No identifier", "\"" ++ show ident ++ "\"", "was found"]
+      Nothing -> throwTypeError $ Arabica.Abs.NoIdentifierFound p ident
       Just varType -> do
         case varType of
           Arabica.Abs.Fun funType argTypes -> do
             exprTypes <- mapM typeExpr exprs
             confirmTypes p ident 1 exprTypes argTypes
             pure funType
-          _ -> typeError p $ unwords ["Variable", show ident, "is not a function"]
+          _ -> throwTypeError $ Arabica.Abs.NotAFunctionType p ident
   Arabica.Abs.EString _ string -> pure $ Arabica.Abs.Str
   Arabica.Abs.Neg p expr -> do
     exprType <- typeExpr expr
     if exprType == Arabica.Abs.Int then pure $ Arabica.Abs.Int
-    else typeError p $ unwords ["Only integers can be negated"]
+    else throwTypeError $ Arabica.Abs.ArithNegationType p exprType
   Arabica.Abs.Not p expr -> do
     exprType <- typeExpr expr
     if exprType == Arabica.Abs.Bool then pure $ Arabica.Abs.Bool
-    else typeError p $ unwords ["Only booleans can be used in logical negation"]
+    else throwTypeError $ Arabica.Abs.LogicNegationType p exprType
   Arabica.Abs.EMul p expr1 op expr2 -> do
     exprType1 <- typeExpr expr1
     case exprType1 of
@@ -223,8 +226,10 @@ typeExpr x = case x of
         exprType2 <- typeExpr expr2
         case exprType2 of
           Arabica.Abs.Int -> pure $ Arabica.Abs.Int
-          _ -> typeError p $ unwords ["Second operand of", show x, "is not an integer"]
-      _ -> typeError p $ unwords ["First operand of", show x, "is not an integer"]
+          -- _ -> typeError p $ unwords ["Second operand of", show x, "is not an integer"]
+          otherType2 -> throwTypeError $ Arabica.Abs.SecondOperandShouldBeType p Arabica.Abs.Int otherType2
+      -- _ -> typeError p $ unwords ["First operand of", show x, "is not an integer"]
+      otherType1 -> throwTypeError $ Arabica.Abs.FirstOperandShouldBeType p Arabica.Abs.Int otherType1
   Arabica.Abs.EAdd p expr1 _ expr2 -> do
     exprType1 <- typeExpr expr1
     case exprType1 of
@@ -232,8 +237,8 @@ typeExpr x = case x of
         exprType2 <- typeExpr expr2
         case exprType2 of
           Arabica.Abs.Int -> pure $ Arabica.Abs.Int
-          _ -> typeError p $ unwords ["Second operand of", show x, "is not an integer"]
-      _ -> typeError p $ unwords ["First operand of", show x, "is not an integer"]
+          otherType2 -> throwTypeError $ Arabica.Abs.SecondOperandShouldBeType p Arabica.Abs.Int otherType2
+      otherType1 -> throwTypeError $ Arabica.Abs.FirstOperandShouldBeType p Arabica.Abs.Int otherType1
   Arabica.Abs.ERel p expr1 _ expr2 -> do
     exprType1 <- typeExpr expr1
     case exprType1 of
@@ -241,8 +246,8 @@ typeExpr x = case x of
         exprType2 <- typeExpr expr2
         case exprType2 of
           Arabica.Abs.Int -> pure $ Arabica.Abs.Bool
-          _ -> typeError p $ unwords ["Second operand of", show x, "is not an integer"]
-      _ -> typeError p $ unwords ["First operand of", show x, "is not an integer"]
+          otherType2 -> throwTypeError $ Arabica.Abs.SecondOperandShouldBeType p Arabica.Abs.Int otherType2
+      otherType1 -> throwTypeError $ Arabica.Abs.FirstOperandShouldBeType p Arabica.Abs.Int otherType1
   Arabica.Abs.EAnd p expr1 expr2 -> typeExpr $ Arabica.Abs.EOr p expr1 expr2
   Arabica.Abs.EOr p expr1 expr2 -> do
     exprType1 <- typeExpr expr1
@@ -251,5 +256,5 @@ typeExpr x = case x of
         exprType2 <- typeExpr expr2
         case exprType2 of
           Arabica.Abs.Bool -> pure $ Arabica.Abs.Bool
-          _ -> typeError p $ unwords ["Second operand of", show x, "is not a boolean"]
-      _ -> typeError p $ unwords ["First operand of", show x, "is not a boolean"]
+          otherType2 -> throwTypeError $ Arabica.Abs.SecondOperandShouldBeType p Arabica.Abs.Bool otherType2
+      otherType1 -> throwTypeError $ Arabica.Abs.FirstOperandShouldBeType p Arabica.Abs.Int otherType1
