@@ -95,7 +95,8 @@ transStmt inLoop x = case x of
       [] -> normalPass
       (x:xs) -> do
         -- debugMessage $ unwords ["DECL", show (x:xs)]
-        newVarEnv <- transItem False x
+        let absType = transType type_
+        newVarEnv <- transItem absType False x
         local (const newVarEnv) $ transStmt inLoop (Arabica.Abs.Decl p type_ xs)
   Arabica.Abs.Ass p ident expr ->  do
     -- env <- get
@@ -202,9 +203,12 @@ transStmt inLoop x = case x of
       _ -> failure p "Can only print integers, booleans and strings"
     normalPass
 
-transItem :: Bool -> Arabica.Abs.Item -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
-transItem readOnly x = case x of
-  Arabica.Abs.NoInit p ident -> failure p "NoInit"
+transItem :: Arabica.Abs.AbsType -> Bool -> Arabica.Abs.Item -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
+transItem valType readOnly x = case x of
+  Arabica.Abs.NoInit p ident -> do
+    val <- defaultVal valType
+    newVarEnv <- newVariable readOnly ident val
+    pure $ newVarEnv
   Arabica.Abs.Init _ ident expr -> do
     val <- transExpr expr
     newVarEnv <- newVariable readOnly ident val
