@@ -24,14 +24,14 @@ import Control.Monad.Trans.Except
 
 type Err = Either String
 
-assignArgsToVals :: Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.AbsArg] -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
-assignArgsToVals _ _ [] [] = ask
-assignArgsToVals p ident _ [] = errorMessage $ Arabica.Abs.TooManyArgs p ident
-assignArgsToVals p ident [] _ = errorMessage $ Arabica.Abs.NotEnoughArgs p ident
-assignArgsToVals p ident (e:es) ((Arabica.Abs.AbsArg type_ ident_):as) = do
-  val <- transExpr e
+assignArgsToVals :: Arabica.Abs.VarEnv -> Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.AbsArg] -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
+assignArgsToVals _ _ _ [] [] = ask
+assignArgsToVals _ p ident _ [] = errorMessage $ Arabica.Abs.TooManyArgs p ident
+assignArgsToVals _ p ident [] _ = errorMessage $ Arabica.Abs.NotEnoughArgs p ident
+assignArgsToVals oldEnv p ident (e:es) ((Arabica.Abs.AbsArg type_ ident_):as) = do
+  val <- local (const oldEnv) $ transExpr e
   newVarEnv <- newVariable False ident_ val
-  local (const newVarEnv) $ assignArgsToVals p ident es as
+  local (const newVarEnv) $ assignArgsToVals oldEnv p ident es as
 
 transProgram :: Arabica.Abs.Program -> Arabica.Abs.InterpretingMonadIO ()
 transProgram x = case x of
@@ -255,12 +255,13 @@ transExpr x = case x of
         -- i dodać rozróżnienie na funkcje i lambdy (ewentulanie dodać do FunVal środowisko)
         oldFunVarEnv <- local (const M.empty) $ assignClosureToVals closure
         -- debugMessage $ unwords ["oldFunVarEnv:", show oldFunVarEnv]
-        funVarEnv <- local (const oldFunVarEnv) $ assignArgsToVals p ident exprs args
+        funVarEnv <- local (const oldFunVarEnv) $ assignArgsToVals varEnv p ident exprs args
+        newFunVarEnv <- local (const funVarEnv) $ newVariable True ident (Arabica.Abs.FunVal type_ args block closure)
         -- testtest <- getClosureFromCurrentEnvironment funVarEnv
         -- let funVarEnv = oldfunVarEnv
-        -- debugMessage $ unwords ["apply function with environment", show funVarEnv]
+        -- debugMessage $ unwords ["apply function with environment", show newFunVarEnv]
         -- debugMessage $ unwords ["apply function with state", show currState]
-        (_, retVal, _) <- local (const funVarEnv) $ transBlock False block
+        (_, retVal, _) <- local (const newFunVarEnv) $ transBlock False block
         case retVal of
           -- TODO: zrób typecheck zwracanej wartości. Wiem, że jest w typecheckingu, ale bądźmi poważni
           Just x -> pure x

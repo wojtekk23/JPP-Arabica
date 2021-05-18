@@ -17,4 +17,6 @@ int main() {
 
     print( x );
     print( y );
+
+    return 0;
 }
