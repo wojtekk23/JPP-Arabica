@@ -8,7 +8,7 @@ import Prelude
   , Int, (>)
   , String, (++), unlines, unwords
   , Show, show
-  , IO, (>>), (>>=), mapM_, putStrLn
+  , (>>), (>>=), mapM_, putStrLn
   , FilePath
   , getContents, readFile
   , Maybe(..)
@@ -16,6 +16,7 @@ import Prelude
 import System.Environment ( getArgs )
 import System.Exit        ( exitFailure, exitSuccess )
 import Control.Monad      ( when )
+import System.IO
 
 import Arabica.Abs 
 import Arabica.Lex   ( Token )
@@ -92,7 +93,7 @@ runProgram v p s =
       -- showTree v tree
       expEnv <- runExceptT $ execStateT (runReaderT (transProgram tree) M.empty) (M.empty, 0)
       case expEnv of
-        Left e -> putStrLn $ getExceptionMessage e
+        Left e -> hPutStrLn stderr $ getExceptionMessage e
         -- Right newEnv -> putStrLn $ unwords ["Środowisko", show newEnv]
         Right _ -> putStrLn "The end"
       exitSuccess
@@ -141,7 +142,7 @@ runTypeCheck v p s =
       -- showTree v tree
       typeState <- runExceptT $ runReaderT (typeCheckProgram tree) M.empty
       case typeState of
-        Left e -> putStrLn $ getTypeErrorMessage e
+        Left e -> hPutStrLn stderr $ getTypeErrorMessage e
         Right _ -> putStrLn $ show "Typ ok"
       exitSuccess
   where
