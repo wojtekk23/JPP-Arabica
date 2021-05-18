@@ -1,4 +1,3 @@
-// TODO: tablice wielowymiarowa (żeby działało arr[i][j])
 // Tablice - tablica wielowymiarowa
 
 int main() {

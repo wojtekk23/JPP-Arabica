@@ -17,7 +17,7 @@ all : Arabica/Test
 # Rules for building the parser.
 
 Arabica/Abs.hs Arabica/Lex.x Arabica/Par.y Arabica/Print.hs Arabica/Test.hs : arabica.cf
-	bnfc --haskell -d arabica.cf
+	bnfc --haskell -d --functor arabica.cf
 
 %.hs : %.y
 	${HAPPY} ${HAPPY_OPTS} $<

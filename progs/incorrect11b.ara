@@ -1,0 +1,5 @@
+// Zły typ zwracany przez funkcję (wersja z void)
+
+int main() {
+    return;
+}

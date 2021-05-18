@@ -110,124 +110,124 @@ instance Print Double where
 instance Print Arabica.Abs.Ident where
   prt _ (Arabica.Abs.Ident i) = doc $ showString i
 
-instance Print Arabica.Abs.Program where
+instance Print (Arabica.Abs.Program' a) where
   prt i = \case
-    Arabica.Abs.Program topdefs -> prPrec i 0 (concatD [prt 0 topdefs])
+    Arabica.Abs.Program _ topdefs -> prPrec i 0 (concatD [prt 0 topdefs])
 
-instance Print Arabica.Abs.TopDef where
+instance Print (Arabica.Abs.TopDef' a) where
   prt i = \case
-    Arabica.Abs.FnDef type_ id_ args block -> prPrec i 0 (concatD [prt 0 type_, prt 0 id_, doc (showString "("), prt 0 args, doc (showString ")"), prt 0 block])
+    Arabica.Abs.FnDef _ type_ id_ args block -> prPrec i 0 (concatD [prt 0 type_, prt 0 id_, doc (showString "("), prt 0 args, doc (showString ")"), prt 0 block])
   prtList _ [x] = concatD [prt 0 x]
   prtList _ (x:xs) = concatD [prt 0 x, prt 0 xs]
 
-instance Print [Arabica.Abs.TopDef] where
+instance Print [Arabica.Abs.TopDef' a] where
   prt = prtList
 
-instance Print Arabica.Abs.Arg where
+instance Print (Arabica.Abs.Arg' a) where
   prt i = \case
-    Arabica.Abs.Arg type_ id_ -> prPrec i 0 (concatD [prt 0 type_, prt 0 id_])
+    Arabica.Abs.Arg _ type_ id_ -> prPrec i 0 (concatD [prt 0 type_, prt 0 id_])
   prtList _ [] = concatD []
   prtList _ [x] = concatD [prt 0 x]
   prtList _ (x:xs) = concatD [prt 0 x, doc (showString ","), prt 0 xs]
 
-instance Print [Arabica.Abs.Arg] where
+instance Print [Arabica.Abs.Arg' a] where
   prt = prtList
 
-instance Print Arabica.Abs.Block where
+instance Print (Arabica.Abs.Block' a) where
   prt i = \case
-    Arabica.Abs.Block stmts -> prPrec i 0 (concatD [doc (showString "{"), prt 0 stmts, doc (showString "}")])
+    Arabica.Abs.Block _ stmts -> prPrec i 0 (concatD [doc (showString "{"), prt 0 stmts, doc (showString "}")])
 
-instance Print [Arabica.Abs.Stmt] where
+instance Print [Arabica.Abs.Stmt' a] where
   prt = prtList
 
-instance Print Arabica.Abs.Stmt where
+instance Print (Arabica.Abs.Stmt' a) where
   prt i = \case
-    Arabica.Abs.Empty -> prPrec i 0 (concatD [doc (showString ";")])
-    Arabica.Abs.BStmt block -> prPrec i 0 (concatD [prt 0 block])
-    Arabica.Abs.Decl type_ items -> prPrec i 0 (concatD [prt 0 type_, prt 0 items, doc (showString ";")])
-    Arabica.Abs.Ass id_ expr -> prPrec i 0 (concatD [prt 0 id_, doc (showString "="), prt 0 expr, doc (showString ";")])
-    Arabica.Abs.ArrAss id_ expr1 expr2 -> prPrec i 0 (concatD [prt 0 id_, doc (showString "["), prt 6 expr1, doc (showString "]"), doc (showString "="), prt 0 expr2, doc (showString ";")])
-    Arabica.Abs.Incr id_ -> prPrec i 0 (concatD [prt 0 id_, doc (showString "++"), doc (showString ";")])
-    Arabica.Abs.Decr id_ -> prPrec i 0 (concatD [prt 0 id_, doc (showString "--"), doc (showString ";")])
-    Arabica.Abs.Ret expr -> prPrec i 0 (concatD [doc (showString "return"), prt 0 expr, doc (showString ";")])
-    Arabica.Abs.VRet -> prPrec i 0 (concatD [doc (showString "return"), doc (showString ";")])
-    Arabica.Abs.Cond expr stmt -> prPrec i 0 (concatD [doc (showString "if"), doc (showString "("), prt 0 expr, doc (showString ")"), prt 0 stmt])
-    Arabica.Abs.CondElse expr stmt1 stmt2 -> prPrec i 0 (concatD [doc (showString "if"), doc (showString "("), prt 0 expr, doc (showString ")"), prt 0 stmt1, doc (showString "else"), prt 0 stmt2])
-    Arabica.Abs.While expr stmt -> prPrec i 0 (concatD [doc (showString "while"), doc (showString "("), prt 0 expr, doc (showString ")"), prt 0 stmt])
-    Arabica.Abs.Break -> prPrec i 0 (concatD [doc (showString "break"), doc (showString ";")])
-    Arabica.Abs.Continue -> prPrec i 0 (concatD [doc (showString "continue"), doc (showString ";")])
-    Arabica.Abs.SExp expr -> prPrec i 0 (concatD [prt 0 expr, doc (showString ";")])
-    Arabica.Abs.ForTo id_ expr1 expr2 stmt -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id_, doc (showString "="), prt 0 expr1, doc (showString "to"), prt 0 expr2, doc (showString "do"), prt 0 stmt])
-    Arabica.Abs.Print expr -> prPrec i 0 (concatD [doc (showString "print("), prt 0 expr, doc (showString ")")])
+    Arabica.Abs.Empty _ -> prPrec i 0 (concatD [doc (showString ";")])
+    Arabica.Abs.BStmt _ block -> prPrec i 0 (concatD [prt 0 block])
+    Arabica.Abs.Decl _ type_ items -> prPrec i 0 (concatD [prt 0 type_, prt 0 items, doc (showString ";")])
+    Arabica.Abs.Ass _ id_ expr -> prPrec i 0 (concatD [prt 0 id_, doc (showString "="), prt 0 expr, doc (showString ";")])
+    Arabica.Abs.ArrAss _ id_ expr1 expr2 -> prPrec i 0 (concatD [prt 0 id_, doc (showString "["), prt 6 expr1, doc (showString "]"), doc (showString "="), prt 0 expr2, doc (showString ";")])
+    Arabica.Abs.Incr _ id_ -> prPrec i 0 (concatD [prt 0 id_, doc (showString "++"), doc (showString ";")])
+    Arabica.Abs.Decr _ id_ -> prPrec i 0 (concatD [prt 0 id_, doc (showString "--"), doc (showString ";")])
+    Arabica.Abs.Ret _ expr -> prPrec i 0 (concatD [doc (showString "return"), prt 0 expr, doc (showString ";")])
+    Arabica.Abs.VRet _ -> prPrec i 0 (concatD [doc (showString "return"), doc (showString ";")])
+    Arabica.Abs.Cond _ expr stmt -> prPrec i 0 (concatD [doc (showString "if"), doc (showString "("), prt 0 expr, doc (showString ")"), prt 0 stmt])
+    Arabica.Abs.CondElse _ expr stmt1 stmt2 -> prPrec i 0 (concatD [doc (showString "if"), doc (showString "("), prt 0 expr, doc (showString ")"), prt 0 stmt1, doc (showString "else"), prt 0 stmt2])
+    Arabica.Abs.While _ expr stmt -> prPrec i 0 (concatD [doc (showString "while"), doc (showString "("), prt 0 expr, doc (showString ")"), prt 0 stmt])
+    Arabica.Abs.Break _ -> prPrec i 0 (concatD [doc (showString "break"), doc (showString ";")])
+    Arabica.Abs.Continue _ -> prPrec i 0 (concatD [doc (showString "continue"), doc (showString ";")])
+    Arabica.Abs.SExp _ expr -> prPrec i 0 (concatD [prt 0 expr, doc (showString ";")])
+    Arabica.Abs.ForTo _ id_ expr1 expr2 stmt -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id_, doc (showString "="), prt 0 expr1, doc (showString "to"), prt 0 expr2, doc (showString "do"), prt 0 stmt])
+    Arabica.Abs.Print _ expr -> prPrec i 0 (concatD [doc (showString "print("), prt 0 expr, doc (showString ")")])
   prtList _ [] = concatD []
   prtList _ (x:xs) = concatD [prt 0 x, prt 0 xs]
 
-instance Print Arabica.Abs.Item where
+instance Print (Arabica.Abs.Item' a) where
   prt i = \case
-    Arabica.Abs.NoInit id_ -> prPrec i 0 (concatD [prt 0 id_])
-    Arabica.Abs.Init id_ expr -> prPrec i 0 (concatD [prt 0 id_, doc (showString "="), prt 0 expr])
+    Arabica.Abs.NoInit _ id_ -> prPrec i 0 (concatD [prt 0 id_])
+    Arabica.Abs.Init _ id_ expr -> prPrec i 0 (concatD [prt 0 id_, doc (showString "="), prt 0 expr])
   prtList _ [x] = concatD [prt 0 x]
   prtList _ (x:xs) = concatD [prt 0 x, doc (showString ","), prt 0 xs]
 
-instance Print [Arabica.Abs.Item] where
+instance Print [Arabica.Abs.Item' a] where
   prt = prtList
 
-instance Print Arabica.Abs.Type where
+instance Print (Arabica.Abs.Type' a) where
   prt i = \case
-    Arabica.Abs.Int -> prPrec i 0 (concatD [doc (showString "int")])
-    Arabica.Abs.Str -> prPrec i 0 (concatD [doc (showString "string")])
-    Arabica.Abs.Bool -> prPrec i 0 (concatD [doc (showString "bool")])
-    Arabica.Abs.Void -> prPrec i 0 (concatD [doc (showString "void")])
-    Arabica.Abs.Fun type_ types -> prPrec i 0 (concatD [doc (showString "["), prt 0 type_, doc (showString "]"), doc (showString "("), prt 0 types, doc (showString ")")])
-    Arabica.Abs.Array type_ -> prPrec i 0 (concatD [doc (showString "Array"), doc (showString "<"), prt 0 type_, doc (showString ">")])
+    Arabica.Abs.IntType _ -> prPrec i 0 (concatD [doc (showString "int")])
+    Arabica.Abs.StrTpye _ -> prPrec i 0 (concatD [doc (showString "string")])
+    Arabica.Abs.BoolType _ -> prPrec i 0 (concatD [doc (showString "bool")])
+    Arabica.Abs.VoidType _ -> prPrec i 0 (concatD [doc (showString "void")])
+    Arabica.Abs.FunType _ type_ types -> prPrec i 0 (concatD [doc (showString "["), prt 0 type_, doc (showString "]"), doc (showString "("), prt 0 types, doc (showString ")")])
+    Arabica.Abs.ArrayType _ type_ -> prPrec i 0 (concatD [doc (showString "Array"), doc (showString "<"), prt 0 type_, doc (showString ">")])
   prtList _ [] = concatD []
   prtList _ [x] = concatD [prt 0 x]
   prtList _ (x:xs) = concatD [prt 0 x, doc (showString ","), prt 0 xs]
 
-instance Print [Arabica.Abs.Type] where
+instance Print [Arabica.Abs.Type' a] where
   prt = prtList
 
-instance Print Arabica.Abs.Expr where
+instance Print (Arabica.Abs.Expr' a) where
   prt i = \case
-    Arabica.Abs.EArray type_ n -> prPrec i 9 (concatD [doc (showString "new"), prt 0 type_, doc (showString "["), prt 0 n, doc (showString "]")])
-    Arabica.Abs.EArrElem id_ expr -> prPrec i 8 (concatD [prt 0 id_, doc (showString "["), prt 6 expr, doc (showString "]")])
-    Arabica.Abs.ELambda type_ args block -> prPrec i 7 (concatD [doc (showString "["), prt 0 type_, doc (showString "]"), doc (showString "("), prt 0 args, doc (showString ")"), prt 0 block])
-    Arabica.Abs.EVar id_ -> prPrec i 6 (concatD [prt 0 id_])
-    Arabica.Abs.ELitInt n -> prPrec i 6 (concatD [prt 0 n])
-    Arabica.Abs.ELitTrue -> prPrec i 6 (concatD [doc (showString "true")])
-    Arabica.Abs.ELitFalse -> prPrec i 6 (concatD [doc (showString "false")])
-    Arabica.Abs.EApp id_ exprs -> prPrec i 6 (concatD [prt 0 id_, doc (showString "("), prt 0 exprs, doc (showString ")")])
-    Arabica.Abs.EString str -> prPrec i 6 (concatD [prt 0 str])
-    Arabica.Abs.Neg expr -> prPrec i 5 (concatD [doc (showString "-"), prt 6 expr])
-    Arabica.Abs.Not expr -> prPrec i 5 (concatD [doc (showString "!"), prt 6 expr])
-    Arabica.Abs.EMul expr1 mulop expr2 -> prPrec i 4 (concatD [prt 4 expr1, prt 0 mulop, prt 5 expr2])
-    Arabica.Abs.EAdd expr1 addop expr2 -> prPrec i 3 (concatD [prt 3 expr1, prt 0 addop, prt 4 expr2])
-    Arabica.Abs.ERel expr1 relop expr2 -> prPrec i 2 (concatD [prt 2 expr1, prt 0 relop, prt 3 expr2])
-    Arabica.Abs.EAnd expr1 expr2 -> prPrec i 1 (concatD [prt 2 expr1, doc (showString "&&"), prt 1 expr2])
-    Arabica.Abs.EOr expr1 expr2 -> prPrec i 0 (concatD [prt 1 expr1, doc (showString "||"), prt 0 expr2])
+    Arabica.Abs.EArray _ type_ n -> prPrec i 9 (concatD [doc (showString "new"), prt 0 type_, doc (showString "["), prt 0 n, doc (showString "]")])
+    Arabica.Abs.EArrElem _ id_ expr -> prPrec i 8 (concatD [prt 0 id_, doc (showString "["), prt 6 expr, doc (showString "]")])
+    Arabica.Abs.ELambda _ type_ args block -> prPrec i 7 (concatD [doc (showString "["), prt 0 type_, doc (showString "]"), doc (showString "("), prt 0 args, doc (showString ")"), prt 0 block])
+    Arabica.Abs.EVar _ id_ -> prPrec i 6 (concatD [prt 0 id_])
+    Arabica.Abs.ELitInt _ n -> prPrec i 6 (concatD [prt 0 n])
+    Arabica.Abs.ELitTrue _ -> prPrec i 6 (concatD [doc (showString "true")])
+    Arabica.Abs.ELitFalse _ -> prPrec i 6 (concatD [doc (showString "false")])
+    Arabica.Abs.EApp _ id_ exprs -> prPrec i 6 (concatD [prt 0 id_, doc (showString "("), prt 0 exprs, doc (showString ")")])
+    Arabica.Abs.EString _ str -> prPrec i 6 (concatD [prt 0 str])
+    Arabica.Abs.Neg _ expr -> prPrec i 5 (concatD [doc (showString "-"), prt 6 expr])
+    Arabica.Abs.Not _ expr -> prPrec i 5 (concatD [doc (showString "!"), prt 6 expr])
+    Arabica.Abs.EMul _ expr1 mulop expr2 -> prPrec i 4 (concatD [prt 4 expr1, prt 0 mulop, prt 5 expr2])
+    Arabica.Abs.EAdd _ expr1 addop expr2 -> prPrec i 3 (concatD [prt 3 expr1, prt 0 addop, prt 4 expr2])
+    Arabica.Abs.ERel _ expr1 relop expr2 -> prPrec i 2 (concatD [prt 2 expr1, prt 0 relop, prt 3 expr2])
+    Arabica.Abs.EAnd _ expr1 expr2 -> prPrec i 1 (concatD [prt 2 expr1, doc (showString "&&"), prt 1 expr2])
+    Arabica.Abs.EOr _ expr1 expr2 -> prPrec i 0 (concatD [prt 1 expr1, doc (showString "||"), prt 0 expr2])
   prtList _ [] = concatD []
   prtList _ [x] = concatD [prt 0 x]
   prtList _ (x:xs) = concatD [prt 0 x, doc (showString ","), prt 0 xs]
 
-instance Print [Arabica.Abs.Expr] where
+instance Print [Arabica.Abs.Expr' a] where
   prt = prtList
 
-instance Print Arabica.Abs.AddOp where
+instance Print (Arabica.Abs.AddOp' a) where
   prt i = \case
-    Arabica.Abs.Plus -> prPrec i 0 (concatD [doc (showString "+")])
-    Arabica.Abs.Minus -> prPrec i 0 (concatD [doc (showString "-")])
+    Arabica.Abs.Plus _ -> prPrec i 0 (concatD [doc (showString "+")])
+    Arabica.Abs.Minus _ -> prPrec i 0 (concatD [doc (showString "-")])
 
-instance Print Arabica.Abs.MulOp where
+instance Print (Arabica.Abs.MulOp' a) where
   prt i = \case
-    Arabica.Abs.Times -> prPrec i 0 (concatD [doc (showString "*")])
-    Arabica.Abs.Div -> prPrec i 0 (concatD [doc (showString "/")])
+    Arabica.Abs.Times _ -> prPrec i 0 (concatD [doc (showString "*")])
+    Arabica.Abs.Div _ -> prPrec i 0 (concatD [doc (showString "/")])
 
-instance Print Arabica.Abs.RelOp where
+instance Print (Arabica.Abs.RelOp' a) where
   prt i = \case
-    Arabica.Abs.LTH -> prPrec i 0 (concatD [doc (showString "<")])
-    Arabica.Abs.LE -> prPrec i 0 (concatD [doc (showString "<=")])
-    Arabica.Abs.GTH -> prPrec i 0 (concatD [doc (showString ">")])
-    Arabica.Abs.GE -> prPrec i 0 (concatD [doc (showString ">=")])
-    Arabica.Abs.EQU -> prPrec i 0 (concatD [doc (showString "==")])
-    Arabica.Abs.NE -> prPrec i 0 (concatD [doc (showString "!=")])
+    Arabica.Abs.LTH _ -> prPrec i 0 (concatD [doc (showString "<")])
+    Arabica.Abs.LE _ -> prPrec i 0 (concatD [doc (showString "<=")])
+    Arabica.Abs.GTH _ -> prPrec i 0 (concatD [doc (showString ">")])
+    Arabica.Abs.GE _ -> prPrec i 0 (concatD [doc (showString ">=")])
+    Arabica.Abs.EQU _ -> prPrec i 0 (concatD [doc (showString "==")])
+    Arabica.Abs.NE _ -> prPrec i 0 (concatD [doc (showString "!=")])
 

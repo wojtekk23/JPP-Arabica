@@ -1,0 +1,8 @@
+// Zły typ przypisywany elementowi tablicy
+
+int main() {
+    Array<string> strs = new string[10];
+    strs[5] = 1;
+    
+    return 0;
+}

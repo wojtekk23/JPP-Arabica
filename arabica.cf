@@ -61,17 +61,17 @@ Print.     Stmt ::= "print(" Expr ")" ;
 
 -- Types ---------------------------------------------------
 
-Int.       Type ::= "int" ;
+IntType.   Type ::= "int" ;
 
-Str.       Type ::= "string" ;
+StrTpye.   Type ::= "string" ;
 
-Bool.      Type ::= "bool" ;
+BoolType.  Type ::= "bool" ;
 
-Void.      Type ::= "void" ;
+VoidType.  Type ::= "void" ;
 
-Fun.       Type ::= "[" Type "]" "(" [Type] ")" ;
+FunType.   Type ::= "[" Type "]" "(" [Type] ")" ;
 
-Array.     Type ::= "Array" "<" Type ">" ;
+ArrayType. Type ::= "Array" "<" Type ">" ;
 
 separator  Type "," ;       
 
