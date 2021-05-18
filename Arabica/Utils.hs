@@ -13,14 +13,8 @@ if' :: Bool -> a -> a -> a
 if' True  x _ = x
 if' False _ y = y
 
-errorExpM :: Arabica.Abs.InterpretingMonadIO a
-errorExpM = errorInterpretingMonadIO
-
-errorInterpretingMonadIO :: Arabica.Abs.InterpretingMonadIO a
-errorInterpretingMonadIO = lift $ lift $ throwE $ Arabica.Abs.StringError "ERROR"
-
-failure :: Show a => a -> Arabica.Abs.InterpretingMonadIO b
-failure x = lift $ lift $ throwE $ Arabica.Abs.StringError $ show x
+failure :: Show a => Arabica.Abs.BNFC'Position -> a -> Arabica.Abs.InterpretingMonadIO b
+failure p x = lift $ lift $ throwE $ Arabica.Abs.StringError p $ show x
 
 errorMessage :: Arabica.Abs.Exception -> Arabica.Abs.InterpretingMonadIO a
 errorMessage e = lift $ lift $ throwE e
@@ -47,7 +41,7 @@ defaultVal type_ = case type_ of
   Arabica.Abs.Str -> pure $ Arabica.Abs.StringVal ""
   Arabica.Abs.Bool -> pure $ Arabica.Abs.BoolVal False
   Arabica.Abs.Array arrType -> pure $ Arabica.Abs.ArrVal arrType (array (0,0) [])
-  _ -> failure "Na razie domyślne wartości mają inty, stringi, boole i tablice"
+  _ -> failure Nothing "Na razie domyślne wartości mają inty, stringi, boole i tablice"
 
 conformValType :: Arabica.Abs.LocVal -> Arabica.Abs.AbsType -> Bool
 conformValType (Arabica.Abs.IntegerVal _) Arabica.Abs.Int = True

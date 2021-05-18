@@ -140,7 +140,7 @@ data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal | F
 type Location = Integer
 
 data Exception 
-    = StringError String
+    = StringError BNFC'Position String
     | DivisionByZero BNFC'Position
     | NoLocation BNFC'Position Ident
     | IncorrectValue BNFC'Position Ident Integer

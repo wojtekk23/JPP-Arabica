@@ -33,10 +33,6 @@ assignArgsToVals p ident (e:es) ((Arabica.Abs.AbsArg type_ ident_):as) = do
   newVarEnv <- newVariable False ident_ val
   local (const newVarEnv) $ assignArgsToVals p ident es as
 
-transIdent :: Arabica.Abs.Ident -> Arabica.Abs.InterpretingMonadIO ()
-transIdent x = case x of
-  Arabica.Abs.Ident string -> failure x
-
 transProgram :: Arabica.Abs.Program -> Arabica.Abs.InterpretingMonadIO ()
 transProgram x = case x of
   Arabica.Abs.Program _ topdefs -> do
@@ -182,8 +178,8 @@ transStmt inLoop x = case x of
       newVarEnv <- newVariable True ident val1
       local (const newVarEnv) $ runForLoop p ident n1 n2 stmt
     else
-      if not (conformValType val1 Arabica.Abs.Int) then errorMessage $ Arabica.Abs.StringError $ unwords ["Typ pierwszej wartości w for-to się nie zgadza"]
-      else errorMessage $ Arabica.Abs.StringError $ unwords ["Typ drugiej wartości w for-to się nie zgadza"]
+      if not (conformValType val1 Arabica.Abs.Int) then errorMessage $ Arabica.Abs.StringError p $ unwords ["Typ pierwszej wartości w for-to się nie zgadza"]
+      else errorMessage $ Arabica.Abs.StringError p $ unwords ["Typ drugiej wartości w for-to się nie zgadza"]
     where
       runForLoop p ident curr n2 stmt = do
         if curr == n2 then normalPass
@@ -196,19 +192,19 @@ transStmt inLoop x = case x of
               case loopState of
                 Arabica.Abs.BreakState -> normalPass
                 _ -> runForLoop p ident (curr+1) n2 stmt
-  Arabica.Abs.Print _ expr -> do
+  Arabica.Abs.Print p expr -> do
     -- Na razie tylko inty
     val <- transExpr expr
     case val of
       Arabica.Abs.IntegerVal n -> lift $ lift $ lift $ putStrLn $ show n
       Arabica.Abs.BoolVal b -> lift $ lift $ lift $ putStrLn $ show b
       Arabica.Abs.StringVal s -> lift $ lift $ lift $ putStrLn $ show s
-      _ -> failure "Can only print integers, booleans and strings"
+      _ -> failure p "Can only print integers, booleans and strings"
     normalPass
 
 transItem :: Bool -> Arabica.Abs.Item -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
 transItem readOnly x = case x of
-  Arabica.Abs.NoInit _ ident -> failure "NoInit"
+  Arabica.Abs.NoInit p ident -> failure p "NoInit"
   Arabica.Abs.Init _ ident expr -> do
     val <- transExpr expr
     newVarEnv <- newVariable readOnly ident val

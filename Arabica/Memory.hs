@@ -41,7 +41,7 @@ updateForVariable p x val = do
     Just (loc, readOnly) -> do
       if readOnly then do
         put $ (M.insert loc val locEnv, lastLoc)
-      else do failure "updateForVariable for NOT read-only variable"    
+      else do failure p "updateForVariable for NOT read-only variable"    
 
 readVariable :: Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.LocVal
 readVariable p x = do
@@ -63,7 +63,7 @@ changeByOne n p ident = do
     Arabica.Abs.IntegerVal m -> do
       updateVariable p ident $ Arabica.Abs.IntegerVal (m+n)
       normalPass
-    _ -> errorMessage $ Arabica.Abs.StringError $ unwords ["Tried to in/decrement variable", show ident, "but it is not an integer"]
+    _ -> errorMessage $ Arabica.Abs.StringError p $ unwords ["Tried to in/decrement variable", show ident, "but it is not an integer"]
 
 getClosureFromCurrentEnvironment :: Arabica.Abs.BNFC'Position -> Arabica.Abs.VarEnv -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.Closure
 getClosureFromCurrentEnvironment p varEnv = do

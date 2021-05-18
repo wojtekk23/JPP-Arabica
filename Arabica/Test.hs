@@ -77,7 +77,7 @@ getExceptionMessage exception =
     Arabica.Abs.NotAFunction p ident -> addPositionToExceptionMessage p $ unwords ["Identifier", show ident, "is not a function"]
     Arabica.Abs.DivisionByZero p -> addPositionToExceptionMessage p $ "Division by 0"
     Arabica.Abs.WrongValueReturned p ident type1 type2 -> addPositionToExceptionMessage p $ unwords ["Function", show ident, "should return", show type1, "but returns", show type2]
-    Arabica.Abs.StringError s -> s
+    Arabica.Abs.StringError p s -> addPositionToExceptionMessage p $ s
 
 runProgram :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
 runProgram v p s =
