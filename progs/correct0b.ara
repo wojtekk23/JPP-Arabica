@@ -1,0 +1,16 @@
+// Inicjalizacja domyślną wartością
+
+int main() {
+    int x;
+    string y;
+    bool z;
+    
+    print("x:");
+    print(x);
+    print("y:");
+    print(y);
+    print("z:");
+    print(z);
+
+    return 0;
+}
