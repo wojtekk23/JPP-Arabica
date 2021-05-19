@@ -1,0 +1,7 @@
+int f() 0;
+
+int main() {
+    print("test");
+
+    return 0;
+}

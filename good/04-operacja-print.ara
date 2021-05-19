@@ -1,0 +1,9 @@
+int main() {
+    print("Domyślnie wypisywane mogą być wartości o typach int, string i bool");
+    print(5);
+    print("test");
+    print(false);
+
+    print("Test ok");
+    return 0;
+}

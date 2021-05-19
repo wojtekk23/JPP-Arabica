@@ -12,10 +12,8 @@ import Control.Monad.Trans.Except
 -- Is new variable readonly?
 newVariable :: Bool -> Arabica.Abs.Ident -> Arabica.Abs.LocVal -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
 newVariable readOnly x val = do
-  -- TODO: Na razie chyba przyzwalamy na powtórzone deklaracje, chyba trzeba będzie zmienić
   varEnv <- ask
   (locEnv, loc) <- get
-  -- debugMessage $ unwords [show x, show val]
   put $ (M.insert loc val locEnv, loc+1)
   pure $ M.insert x (loc, readOnly) varEnv
 
@@ -68,9 +66,7 @@ changeByOne n p ident = do
 getClosureFromCurrentEnvironment :: Arabica.Abs.BNFC'Position -> Arabica.Abs.VarEnv -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.Closure
 getClosureFromCurrentEnvironment p varEnv = do
   let varKeys = M.keys varEnv
-  -- debugMessage $ unwords ["varKeys:", show varKeys]
   varVals <- mapM (readVariable p) varKeys
-  -- debugMessage $ unwords ["varVals:", show varVals]
   pure $ M.fromList $ zip varKeys varVals
 
 assignClosureToVals :: Arabica.Abs.Closure -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv

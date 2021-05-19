@@ -1,0 +1,7 @@
+int main() {
+    if ("true") {
+        print("Ten komunikat nie będzie wypisany, bo program skończy się na kontroli typów");
+    }
+
+    return 0;
+}

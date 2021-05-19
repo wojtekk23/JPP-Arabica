@@ -1,0 +1,67 @@
+void f(int x, string s, bool b, Array<int> arr, [void]() proc) {
+    print("x:");
+    print(x);
+    x = -5;
+
+    print("s:");
+    print(s);
+    s = "f_test";
+
+    print("arr[4]:");
+    print(arr[4]);
+    arr[4] = 3;
+
+    proc();
+    proc = [void]() {
+        print("PROCEDURA W f()");
+    };
+}
+
+int main() {
+    int x = 5;
+    string s = "test";
+    bool b = false;
+    Array<int> arr = new int[5];
+    for i = 0 to 5 do {
+        arr[i] = i;
+    }
+    [void]() proc = [void]() {
+        print("PROCEDURA W MAIN");
+    };
+
+    print("-----------------");
+    print("Wartości przed wykonaniem procedury");
+    print("-----------------");
+    print("x:");
+    print(x);
+
+    print("s:");
+    print(s);
+
+    print("arr[4]:");
+    print(arr[4]);
+
+    proc();
+
+    print("-----------------");
+    print("Wykonanie procedury");
+    print("-----------------");
+    f(x, s, b, arr, proc);
+
+    print("-----------------");
+    print("Wartości po wykonaniu procedury");
+    print("-----------------");
+    print("x:");
+    print(x);
+
+    print("s:");
+    print(s);
+
+    print("arr[4]:");
+    print(arr[4]);
+
+    proc();
+
+    print("Test ok");
+    return 0;
+}

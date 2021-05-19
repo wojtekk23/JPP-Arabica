@@ -16,14 +16,6 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
 
--- Bool - czy zmienna jest read-only
--- type VarEnv = M.Map Arabica.Abs.Ident (Arabica.Abs.Location, Bool)
--- type LocEnv = M.Map Arabica.Abs.Location Arabica.Abs.LocVal
--- type LocMemory = (LocEnv, Arabica.Abs.Location)
--- type ExpM a = ReaderT VarEnv Maybe a
-
-type Err = Either String
-
 assignArgsToVals :: Arabica.Abs.VarEnv -> Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.AbsArg] -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
 assignArgsToVals _ _ _ [] [] = ask
 assignArgsToVals _ p ident _ [] = errorMessage $ Arabica.Abs.TooManyArgs p ident
@@ -40,14 +32,12 @@ transProgram x = case x of
   where
     runTopDefs [] = pure ()
     runTopDefs (def:defs) = do
-      -- Czy powinniśmy przejmować się zwracaną wartością?
       (varEnv, _) <- transTopDef def
       local (const varEnv) $ runTopDefs defs
 
 transTopDef :: Arabica.Abs.TopDef -> Arabica.Abs.InterpretingMonadIO (Arabica.Abs.VarEnv, Arabica.Abs.ReturnVal)
 transTopDef x = case x of
   Arabica.Abs.FnDef p type_ ident args block -> do
-    -- Na razie tylko uruchamiaj main
     let Arabica.Abs.Ident str = ident
     let absType = transType type_
     let absArgs = map transArg args
@@ -72,11 +62,6 @@ transBlock inLoop x = case x of
   where
     runStmts varEnv [] = pure $ (varEnv, Nothing, Arabica.Abs.NoLoopState)
     runStmts varEnv (stmt:stmts) = do
-      -- env <- ask
-      -- (locEnv, _) <- get
-      -- debugMessage $ unwords ["VARS", show env]
-      -- debugMessage $ unwords ["LOCS", show locEnv]
-      -- debugMessage $ unwords ["STATEMENT", show stmt]
       (newVarEnv, retVal, loopState) <- transStmt inLoop stmt
       case retVal of
         Just x -> pure $ (newVarEnv, retVal, loopState)
@@ -92,20 +77,13 @@ transStmt inLoop x = case x of
   Arabica.Abs.Empty _ -> normalPass
   Arabica.Abs.BStmt _ block -> transBlock inLoop block
   Arabica.Abs.Decl p type_ items -> do
-    -- Na razie tylko int
     case items of
       [] -> normalPass
       (x:xs) -> do
-        -- debugMessage $ unwords ["DECL", show (x:xs)]
         let absType = transType type_
         newVarEnv <- transItem absType False x
         local (const newVarEnv) $ transStmt inLoop (Arabica.Abs.Decl p type_ xs)
   Arabica.Abs.Ass p ident expr ->  do
-    -- env <- get
-    -- let locVal = runReaderT (transExpr expr) env
-    -- case locVal of
-    --   Nothing -> errorArabica.Abs.InterpretingMonadIO
-    --   Just x -> updateVariable ident x
     val <- transExpr expr
     updateVariable p ident val
     normalPass
@@ -136,17 +114,14 @@ transStmt inLoop x = case x of
   Arabica.Abs.VRet _ -> do
     varEnv <- ask
     pure $ (varEnv, Just Arabica.Abs.VoidVal, Arabica.Abs.NoLoopState)
-  -- TODO: Czy poniższy myk z Arabica.Abs.Empty jest ok?
   Arabica.Abs.Cond p expr stmt -> transStmt inLoop $ Arabica.Abs.CondElse p expr stmt (Arabica.Abs.Empty p)
   Arabica.Abs.CondElse _ expr stmt1 stmt2 -> do
     val <- transExpr expr
-    -- Akceptujemy tylko inty i boole
     case val of
       Arabica.Abs.BoolVal b -> transStmt inLoop $ if' b stmt1 stmt2
       Arabica.Abs.IntegerVal n -> transStmt inLoop $ if' (n /= 0) stmt1 stmt2
   Arabica.Abs.While _ expr stmt -> do
     val <- transExpr expr
-    -- TODO: Napisz to bez powtórzeń
     case val of
       Arabica.Abs.BoolVal b -> do
         if b then do
@@ -156,7 +131,6 @@ transStmt inLoop x = case x of
             Nothing -> do
               case loopState of
                 Arabica.Abs.BreakState -> normalPass
-                -- TODO: Czy tutaj inLoop czy może True? A może False xdd
                 _ -> transStmt inLoop x
         else
           normalPass
@@ -170,9 +144,6 @@ transStmt inLoop x = case x of
     transExpr expr
     normalPass
   Arabica.Abs.ForTo p ident expr1 expr2 stmt -> do
-    -- transItem True item
-    -- val <- transExpr expr
-    -- TODO: NIE DZIAŁA RETURN W PĘTLACH!!!!
     val1 <- transExpr expr1
     val2 <- transExpr expr2
     if (conformValType val1 Arabica.Abs.Int) && (conformValType val2 Arabica.Abs.Int) then do
@@ -196,7 +167,6 @@ transStmt inLoop x = case x of
                 Arabica.Abs.BreakState -> normalPass
                 _ -> runForLoop p ident (curr+1) n2 stmt
   Arabica.Abs.Print p expr -> do
-    -- Na razie tylko inty
     val <- transExpr expr
     case val of
       Arabica.Abs.IntegerVal n -> lift $ lift $ lift $ putStrLn $ show n
@@ -214,7 +184,6 @@ transItem valType readOnly x = case x of
   Arabica.Abs.Init _ ident expr -> do
     val <- transExpr expr
     newVarEnv <- newVariable readOnly ident val
-    -- debugMessage "INIT"
     pure $ newVarEnv
 
 transExpr :: Arabica.Abs.Expr -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.LocVal
@@ -241,7 +210,6 @@ transExpr x = case x of
     let absArgs = map transArg args
     varEnv <- ask
     closure <- getClosureFromCurrentEnvironment p varEnv
-    -- debugMessage $ unwords ["create function with args", show args]
     pure $ Arabica.Abs.FunVal absType absArgs block closure
   Arabica.Abs.EVar p ident -> readVariable p ident
   Arabica.Abs.ELitInt _ integer -> pure $ Arabica.Abs.IntegerVal $ integer
@@ -251,21 +219,12 @@ transExpr x = case x of
     varEnv <- ask
     maybeFun <- readVariable p ident
     case maybeFun of
-      -- TODO: closures
       Arabica.Abs.FunVal type_ args block closure -> do
-        -- TODO: przyzwala na pozyskiwanie zmiennych z środowiska funkcji wywołującej, trzeba to zmienić
-        -- i dodać rozróżnienie na funkcje i lambdy (ewentulanie dodać do FunVal środowisko)
         oldFunVarEnv <- local (const M.empty) $ assignClosureToVals closure
-        -- debugMessage $ unwords ["oldFunVarEnv:", show oldFunVarEnv]
         funVarEnv <- local (const oldFunVarEnv) $ assignArgsToVals varEnv p ident exprs args
         newFunVarEnv <- local (const funVarEnv) $ newVariable True ident (Arabica.Abs.FunVal type_ args block closure)
-        -- testtest <- getClosureFromCurrentEnvironment funVarEnv
-        -- let funVarEnv = oldfunVarEnv
-        -- debugMessage $ unwords ["apply function with environment", show newFunVarEnv]
-        -- debugMessage $ unwords ["apply function with state", show currState]
         (_, retVal, _) <- local (const newFunVarEnv) $ transBlock False block
         case retVal of
-          -- TODO: zrób typecheck zwracanej wartości. Wiem, że jest w typecheckingu, ale bądźmi poważni
           Just x -> pure x
           Nothing -> do
             case type_ of

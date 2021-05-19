@@ -1,0 +1,23 @@
+int main() {
+    int even = 0;
+
+    print("Wypisz liczby parzyste od 0 do 10");
+
+    int i = 0;
+    while (i < 20) {
+        if (i == even) {
+            even = even + 2;
+            print(i);
+            i++;
+            continue;
+        }
+
+        if (i == 11) {
+            break;
+        }
+
+        i++;
+    }
+
+    return 0;
+}

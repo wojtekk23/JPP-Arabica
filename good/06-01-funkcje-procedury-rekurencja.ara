@@ -1,0 +1,17 @@
+int factorial(int x) {
+    if (x <= 0)
+        return 1;
+    else return x*factorial(x-1);
+}
+
+void procedure() {
+    print("Factorial(5) == 120:");
+}
+
+int main() {
+    procedure();
+    print(factorial(5));
+
+    print("Test ok");
+    return 0;
+}

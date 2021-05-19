@@ -1,0 +1,7 @@
+int main() {
+    Array<int> arr = new int[5];
+    print("Zaraz wypisze się komunikat o błędzie wykonania:");
+    arr[5] = 5;
+
+    return 0;
+}

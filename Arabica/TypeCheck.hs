@@ -32,7 +32,6 @@ typeCheckProgram x = case x of
       let Arabica.Abs.FnDef _ _ ident _ _ = topdef
       typeTopDef topdef
       fnType <- getTopDefType topdef
-      -- lift $ lift $ putStrLn $ unwords ["fnType", show fnType]
       local (M.insert ident fnType) $ checkTopDefs topdefs
 
 typeTopDef :: Arabica.Abs.TopDef -> Arabica.Abs.TypeCheckingMonadIO ()
@@ -121,7 +120,6 @@ typeStmts fnType x = case x of
   Arabica.Abs.VRet p -> do
     if fnType == Arabica.Abs.Void then ask
     else throwTypeError $ Arabica.Abs.WrongVoidReturn p fnType
-  -- Chyba nie powinniśmy przypisywać Arabica.Abs.Empty takiej pozycji :/
   Arabica.Abs.Cond p expr stmt -> typeStmts fnType $ Arabica.Abs.CondElse p expr stmt $ Arabica.Abs.Empty p
   Arabica.Abs.CondElse p expr stmt1 stmt2 -> do
     condType <- typeExpr expr
@@ -199,7 +197,6 @@ typeExpr x = case x of
   Arabica.Abs.ELitFalse _ -> pure $ Arabica.Abs.Bool
   Arabica.Abs.EApp p ident exprs -> do
     typeEnv <- ask
-    -- lift $ lift $ putStrLn $ show typeEnv
     let maybeVarType = M.lookup ident typeEnv
     case maybeVarType of
       Nothing -> throwTypeError $ Arabica.Abs.NoIdentifierFound p ident
@@ -226,9 +223,7 @@ typeExpr x = case x of
         exprType2 <- typeExpr expr2
         case exprType2 of
           Arabica.Abs.Int -> pure $ Arabica.Abs.Int
-          -- _ -> typeError p $ unwords ["Second operand of", show x, "is not an integer"]
           otherType2 -> throwTypeError $ Arabica.Abs.SecondOperandShouldBeType p Arabica.Abs.Int otherType2
-      -- _ -> typeError p $ unwords ["First operand of", show x, "is not an integer"]
       otherType1 -> throwTypeError $ Arabica.Abs.FirstOperandShouldBeType p Arabica.Abs.Int otherType1
   Arabica.Abs.EAdd p expr1 _ expr2 -> do
     exprType1 <- typeExpr expr1

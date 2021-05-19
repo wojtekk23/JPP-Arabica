@@ -1,0 +1,37 @@
+Array<int> map_int_array(Array<int> arr, int size, [int](int) f) {
+    for i = 0 to size do {
+        arr[i] = f(arr[i]);
+    }
+
+    return arr;
+}
+
+int main() {
+    Array<int> arr = new int[5];
+    for i = 0 to 5 do {
+        arr[i] = i+1;
+    }
+
+    [int](int) f = [int](int x) {
+        return x*x;
+    };
+
+    print("-----------------");
+    print("Przed map:");
+    print("-----------------");
+    for i = 0 to 5 do {
+        print(arr[i]);
+    }
+
+    print("-----------------");
+    print("Po map:");
+    print("-----------------");
+    arr = map_int_array(arr, 5, f);
+
+    for i = 0 to 5 do {
+        print(arr[i]);
+    }
+
+    print("Test ok");
+    return 0;
+}

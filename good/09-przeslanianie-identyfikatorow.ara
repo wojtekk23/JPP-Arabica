@@ -1,0 +1,15 @@
+int main() {
+    bool x = true;
+
+    if (x) {
+        print(x);
+
+        int x = 3;
+        print(x);
+    }
+
+    print(x);
+
+    print("Test ok");
+    return 0;
+}

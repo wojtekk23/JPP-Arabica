@@ -1,0 +1,23 @@
+// Leniwe obliczanie wyrażeń logicznych
+
+bool untrue() {
+    print("untrue");
+    
+    return false;
+}
+
+bool unfalse() {
+    print("unfalse");
+
+    return true;
+}
+
+int main() {
+    bool x = false && unfalse();
+    bool y = true || untrue();
+
+    print(x);
+    print(y);
+
+    return 0;
+}

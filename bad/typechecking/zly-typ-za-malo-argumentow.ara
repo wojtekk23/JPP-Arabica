@@ -1,0 +1,13 @@
+// Za mało argumentów przekazanych do funkcji
+
+void f(int a, string s) {
+    print(s);
+}
+
+int main() {
+    int a;
+
+    f(a);
+
+    return 0;
+}

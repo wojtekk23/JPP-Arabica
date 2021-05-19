@@ -40,22 +40,6 @@ putStrV v s = when (v > 1) $ putStrLn s
 runFile :: Verbosity -> ParseFun Arabica.Abs.Program -> FilePath -> IO ()
 runFile v p f = putStrLn f >> readFile f >>= runProgram v p
 
-run :: (Print a, Show a) => Verbosity -> ParseFun a -> String -> IO ()
-run v p s =
-  case p ts of
-    Left err -> do
-      putStrLn "\nParse              Failed...\n"
-      putStrV v "Tokens:"
-      putStrV v $ show ts
-      putStrLn err
-      exitFailure
-    Right tree -> do
-      putStrLn "\nParse Successful!"
-      showTree v tree
-      exitSuccess
-  where
-  ts = myLexer s
-
 addPositionToExceptionMessage :: Arabica.Abs.BNFC'Position -> String -> String
 addPositionToExceptionMessage p s = 
   case p of
@@ -84,14 +68,9 @@ runProgram :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
 runProgram v p s =
   case p ts of
     Left err -> do
-      -- putStrLn "\nParse              Failed...\n"
-      -- putStrV v "Tokens:"
-      -- putStrV v $ show ts
       hPutStrLn stderr err
       exitFailure
     Right tree -> do
-      -- putStrLn "\nParse Successful!"
-      -- showTree v tree
       typeState <- runExceptT $ runReaderT (typeCheckProgram tree) M.empty
       case typeState of
         Left e -> do
@@ -103,7 +82,6 @@ runProgram v p s =
             Left e -> do 
               hPutStrLn stderr $ getExceptionMessage e
               exitFailure
-            -- Right newEnv -> putStrLn $ unwords ["Środowisko", show newEnv]
             Right _ -> do
               exitSuccess
   where
@@ -169,7 +147,6 @@ usage = do
     , "  --help          Display this help message."
     , "  (no arguments)  Parse stdin verbosely."
     , "  (files)         Parse content of files verbosely."
-    , "  -s (files)      Silent mode. Parse content of files silently."
     ]
   exitFailure
 
@@ -178,9 +155,7 @@ main = do
   args <- getArgs
   case args of
     ["--help"] -> usage
-    ["--tree"] -> getContents >>= run 2 pProgram
-    ["--type"] -> getContents >>= runTypeCheck 2 pProgram
+    -- ["--type"] -> getContents >>= runTypeCheck 2 pProgram
     []         -> getContents >>= runProgram 2 pProgram
-    "-s":fs    -> mapM_ (runFile 0 pProgram) fs
     fs         -> mapM_ (runFile 2 pProgram) fs
 

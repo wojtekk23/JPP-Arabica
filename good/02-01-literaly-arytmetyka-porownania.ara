@@ -1,0 +1,71 @@
+
+int main() {
+    // int
+    print("-----------------");
+    print("int");
+    print("-----------------");
+
+    int a = 5;
+    int b = 4;
+
+    print("a");
+    print(a);
+    print("b");
+    print(b);
+
+    print("a + b == 9");
+    print(a+b);
+
+    print("a - b == 1");
+    print(a-b);
+
+    print("a * b == 20");
+    print(a*b);
+
+    print("a / b == 1");
+    print(a/b);
+
+    print("a < b == False");
+    print(a < b);
+
+    print("a > b == True");
+    print(a > b);
+
+    print("a == b == False");
+    print(a == b);
+
+    print("a != b == True");
+    print(a != b);
+
+    print("a <= b == False");
+    print(a <= b);
+
+    print("a >= b == True");
+    print(a >= b);
+
+    // string
+    print("-----------------");
+    print("string");
+    print("-----------------");
+    string c = "test";
+
+    print("c == test");
+    print(c);
+
+    // bool
+    print("-----------------");
+    print("bool");
+    print("-----------------");
+
+    bool d = true;
+    bool e = false;
+
+    print("d && e == False");
+    print(d && e);
+
+    print("d || e == True");
+    print(d || e);
+
+    print("Test ok");
+    return 0;
+}

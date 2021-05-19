@@ -1,0 +1,10 @@
+int main() {
+    print("Nie wyświetli się w main");
+    g();
+
+    return 0;
+}
+
+void g() {
+    print("Nie wyświetli się w g");
+}

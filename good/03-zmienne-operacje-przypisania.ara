@@ -1,0 +1,13 @@
+int main() {
+    int x = 4;
+
+    print("x == 4:");
+    print(x);
+
+    x = 2;
+    print("x == 2:");
+    print(x);
+
+    print("Test ok");
+    return 0;
+}
