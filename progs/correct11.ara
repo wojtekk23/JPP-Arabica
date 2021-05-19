@@ -1,0 +1,19 @@
+// Leniwe obliczanie wyrażeń logicznych
+
+bool untrue() {
+    print("Funkcja nic nie zwraca, więc jej wywolanie powoduje blad");
+}
+
+bool unfalse() {
+    print("Funkcja nic nie zwraca, więc jej wywolanie powoduje blad");
+}
+
+int main() {
+    bool x = false && unfalse();
+    bool y = true || untrue();
+
+    print(x);
+    print(y);
+
+    return 0;
+}

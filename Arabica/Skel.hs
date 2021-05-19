@@ -291,12 +291,16 @@ transExpr x = case x of
     transRelOp relop n1 n2
   Arabica.Abs.EAnd _ expr1 expr2 -> do
     Arabica.Abs.BoolVal b1 <- transExpr expr1
-    Arabica.Abs.BoolVal b2 <- transExpr expr2
-    pure $ Arabica.Abs.BoolVal $ b1 && b2
+    if not b1 then pure $ Arabica.Abs.BoolVal b1
+    else do
+      b2 <- transExpr expr2
+      pure $ b2
   Arabica.Abs.EOr _ expr1 expr2 -> do
     Arabica.Abs.BoolVal b1 <- transExpr expr1
-    Arabica.Abs.BoolVal b2 <- transExpr expr2
-    pure $ Arabica.Abs.BoolVal $ b1 || b2
+    if b1 then pure $ Arabica.Abs.BoolVal b1
+    else do
+      b2 <- transExpr expr2
+      pure $ b2
 
 transAddOp :: Arabica.Abs.AddOp -> Integer -> Integer -> Arabica.Abs.Result
 transAddOp x n1 n2 = case x of
