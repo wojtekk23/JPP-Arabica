@@ -20,7 +20,7 @@ Zmienne są wiązane statycznie.
 
 * Typy `int`, `bool` i `string` odpowiadają takim samym typom z C++
 * `void` służy do podkreślenia, że funkcja nie zwraca wartości
-* Funkcje anonimowe (patrz: `correct3.ara`, `correct4.ara`) - zmienne z otaczającego zasięgu są pobierane przez wartość (tak jak capture `[=]` w C++)
+* Funkcje anonimowe (patrz: `good/17-0*.ara`) - zmienne z otaczającego zasięgu są pobierane przez wartość (tak jak capture `[=]` w C++)
 * Brak niejawnej konwersji między typami.
 * Tablice ustalonego rozmiaru (przyjmuje literał liczbowy, nie wyrażenie), indeksowane od 0
 
