@@ -63,21 +63,22 @@ addPositionToExceptionMessage p s =
     Nothing -> unwords ["Position unavailable:", s]
 
 getExceptionMessage :: Arabica.Abs.Exception -> String
-getExceptionMessage exception = 
-  case exception of
-    Arabica.Abs.NoLocation p ident -> addPositionToExceptionMessage p $ unwords ["No location for variable", show ident]
-    Arabica.Abs.IncorrectValue p ident integer -> addPositionToExceptionMessage p $ unwords ["Incorrect value for address", show integer, "and variable", show ident]
-    Arabica.Abs.IndexOutOfBounds p n (lower, upper) ident -> addPositionToExceptionMessage p $ unwords ["Position", show n, "out of bounds", show (lower, upper), "for array", show ident]
-    Arabica.Abs.ArrayAssignMismatch p ident -> addPositionToExceptionMessage p $ unwords ["Types of array", show ident, "and assigned expression do not match"]
-    Arabica.Abs.IndexNotInteger p ident -> addPositionToExceptionMessage p $ unwords ["Array", show ident, "should be indexed with an integer"]
-    Arabica.Abs.NotAnArray p ident -> addPositionToExceptionMessage p $ unwords ["Variable", show ident, "cannot be indexed because it is not an array"]
-    Arabica.Abs.TooManyArgs p ident -> addPositionToExceptionMessage p $ unwords ["Too many values passed to a function", show ident]
-    Arabica.Abs.NotEnoughArgs p ident -> addPositionToExceptionMessage p $ unwords ["Not enough values passed to a function", show ident]
-    Arabica.Abs.NoValueReturned p ident type_ -> addPositionToExceptionMessage p $ unwords ["Function", show ident, "should return", show type_, "but returns nothing"]
-    Arabica.Abs.NotAFunction p ident -> addPositionToExceptionMessage p $ unwords ["Identifier", show ident, "is not a function"]
-    Arabica.Abs.DivisionByZero p -> addPositionToExceptionMessage p $ "Division by 0"
-    Arabica.Abs.WrongValueReturned p ident type1 type2 -> addPositionToExceptionMessage p $ unwords ["Function", show ident, "should return", show type1, "but returns", show type2]
-    Arabica.Abs.StringError p s -> addPositionToExceptionMessage p $ s
+getExceptionMessage exception = addPositionToExceptionMessage (Arabica.Abs.hasPosition exception) s
+  where
+    s = case exception of
+      Arabica.Abs.NoLocation p ident -> unwords ["No location for variable", show ident]
+      Arabica.Abs.IncorrectValue p ident integer -> unwords ["Incorrect value for address", show integer, "and variable", show ident]
+      Arabica.Abs.IndexOutOfBounds p n (lower, upper) ident -> unwords ["Position", show n, "out of bounds", show (lower, upper), "for array", show ident]
+      Arabica.Abs.ArrayAssignMismatch p ident -> unwords ["Types of array", show ident, "and assigned expression do not match"]
+      Arabica.Abs.IndexNotInteger p ident -> unwords ["Array", show ident, "should be indexed with an integer"]
+      Arabica.Abs.NotAnArray p ident -> unwords ["Variable", show ident, "cannot be indexed because it is not an array"]
+      Arabica.Abs.TooManyArgs p ident -> unwords ["Too many values passed to a function", show ident]
+      Arabica.Abs.NotEnoughArgs p ident -> unwords ["Not enough values passed to a function", show ident]
+      Arabica.Abs.NoValueReturned p ident type_ -> unwords ["Function", show ident, "should return", show type_, "but returns nothing"]
+      Arabica.Abs.NotAFunction p ident -> unwords ["Identifier", show ident, "is not a function"]
+      Arabica.Abs.DivisionByZero p -> "Division by 0"
+      Arabica.Abs.WrongValueReturned p ident type1 type2 -> unwords ["Function", show ident, "should return", show type1, "but returns", show type2]
+      Arabica.Abs.StringError p s -> s
 
 runProgram :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
 runProgram v p s =

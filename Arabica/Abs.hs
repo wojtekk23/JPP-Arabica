@@ -295,6 +295,23 @@ instance HasPosition RelOp where
     EQU p -> p
     NE p -> p
 
+instance HasPosition Exception where
+  hasPosition = \case
+    StringError p _ -> p
+    DivisionByZero p -> p
+    NoLocation p _ -> p
+    IncorrectValue p _ _ -> p
+    IndexOutOfBounds p _ (_, _) _ -> p
+    ArrayAssignMismatch p _ -> p
+    IndexNotInteger p _ -> p
+    NotAnArray p _ -> p
+    TooManyArgs p _ -> p
+    NotEnoughArgs p _ -> p
+    NoValueReturned p _ _ -> p
+    WrongValueReturned p _ _ _ -> p
+    NotAFunction p _ -> p
+    ReadOnlyVariable p _ -> p
+
 instance HasPosition TypeCheckingError where
   hasPosition = \case
     CustomTypeError p _ -> p
