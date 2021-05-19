@@ -66,10 +66,12 @@ transTopDef x = case x of
 
 transBlock :: Bool -> Arabica.Abs.Block -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
 transBlock inLoop x = case x of
-  Arabica.Abs.Block _ stmts -> runStmts stmts
+  Arabica.Abs.Block _ stmts -> do
+    varEnv <- ask
+    local (const varEnv) $ runStmts varEnv stmts
   where
-    runStmts [] = normalPass
-    runStmts (stmt:stmts) = do
+    runStmts varEnv [] = pure $ (varEnv, Nothing, Arabica.Abs.NoLoopState)
+    runStmts varEnv (stmt:stmts) = do
       -- env <- ask
       -- (locEnv, _) <- get
       -- debugMessage $ unwords ["VARS", show env]
@@ -81,9 +83,9 @@ transBlock inLoop x = case x of
         Nothing -> do
           if inLoop then do
             case loopState of
-              Arabica.Abs.NoLoopState -> local (const newVarEnv) $ runStmts stmts
-              _ -> pure $ (newVarEnv, retVal, loopState)
-          else local (const newVarEnv) $ runStmts stmts
+              Arabica.Abs.NoLoopState -> local (const newVarEnv) $ runStmts varEnv stmts
+              _ -> pure $ (varEnv, retVal, loopState)
+          else local (const newVarEnv) $ runStmts varEnv stmts
 
 transStmt :: Bool -> Arabica.Abs.Stmt -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
 transStmt inLoop x = case x of
