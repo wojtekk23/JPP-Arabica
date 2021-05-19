@@ -1,8 +1,0 @@
-// Zła typ wartości przypisywanej
-
-int main() {
-    int x;
-
-    x = "str";
-    return 0;
-}

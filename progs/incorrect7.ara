@@ -1,7 +1,0 @@
-// Zła typ użyty podczas inicjalizacji
-
-int main() {
-    int x = "str";
-
-    return 0;
-}

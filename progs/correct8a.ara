@@ -1,9 +1,0 @@
-// ForTo - wypisz "Hello world" 12 razy
-
-int main() {
-    for i = 0 to 12 do {
-        print("Hello world");
-    }
-
-    return 0;
-}

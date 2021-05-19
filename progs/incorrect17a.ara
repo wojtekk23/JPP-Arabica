@@ -1,7 +1,0 @@
-// Zły typ drugiego wyrażenia w porównaniu
-
-int main() {
-    bool x = 5 < "six";
-
-    return 0;
-}

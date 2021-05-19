@@ -1,5 +1,0 @@
-// Zły typ zwracany przez funkcję
-
-int main() {
-    return "test";
-}

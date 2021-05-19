@@ -1,8 +1,0 @@
-// W negacji logicznej można używać tylko wartości bool
-
-int main() {
-    string x = "test";
-    bool y = !x;
-
-    return 0;
-}

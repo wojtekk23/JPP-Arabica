@@ -1,6 +1,0 @@
-// Brak instrukcji return
-// Sparsuje się w gramatyce, ale interpreter wyrzuci błąd
-
-int main() {
-    print("Brak instrukcji return");
-}

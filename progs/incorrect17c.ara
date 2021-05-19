@@ -1,7 +1,0 @@
-// Zły typ drugiego wyrażenia w operacji logicznej
-
-int main() {
-    bool x = true || "six";
-
-    return 0;
-}

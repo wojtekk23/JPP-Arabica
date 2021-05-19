@@ -1,9 +1,0 @@
-// Inkrementacja nie liczby
-
-int main() {
-    string x = "test";
-
-    x++;
-
-    return 0;
-}

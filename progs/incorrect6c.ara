@@ -1,9 +1,0 @@
-// Tablice - próba indeksowania tablicy wyrażeniem nie będącym liczbą
-
-int main() {
-    Array<int> x = new int[5];
-    string ix = "pozycja czwarta";
-    x[ix] = 4;
-
-    return 0;
-}
