@@ -150,9 +150,16 @@ data Token =
 printPosn :: Posn -> String
 printPosn (Pn _ l c) = "line " ++ show l ++ ", column " ++ show c
 
+printPosn2 :: Posn -> String
+printPosn2 (Pn _ l c) = show l ++ ":" ++ show c
+
 tokenPos :: [Token] -> String
 tokenPos (t:_) = printPosn (tokenPosn t)
 tokenPos [] = "end of file"
+
+tokenPos2 :: [Token] -> String
+tokenPos2 (t:_) = printPosn2 (tokenPosn t)
+tokenPos2 [] = "eof"
 
 tokenPosn :: Token -> Posn
 tokenPosn (PT p _) = p

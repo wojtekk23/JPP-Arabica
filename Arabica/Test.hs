@@ -37,8 +37,8 @@ type Verbosity  = Int
 putStrV :: Verbosity -> String -> IO ()
 putStrV v s = when (v > 1) $ putStrLn s
 
-runFile :: (Print a, Show a) => Verbosity -> ParseFun a -> FilePath -> IO ()
-runFile v p f = putStrLn f >> readFile f >>= run v p
+runFile :: Verbosity -> ParseFun Arabica.Abs.Program -> FilePath -> IO ()
+runFile v p f = putStrLn f >> readFile f >>= runProgram v p
 
 run :: (Print a, Show a) => Verbosity -> ParseFun a -> String -> IO ()
 run v p s =
@@ -83,20 +83,28 @@ runProgram :: Verbosity -> ParseFun Arabica.Abs.Program -> String -> IO ()
 runProgram v p s =
   case p ts of
     Left err -> do
-      putStrLn "\nParse              Failed...\n"
-      putStrV v "Tokens:"
-      putStrV v $ show ts
-      putStrLn err
+      -- putStrLn "\nParse              Failed...\n"
+      -- putStrV v "Tokens:"
+      -- putStrV v $ show ts
+      hPutStrLn stderr err
       exitFailure
     Right tree -> do
-      putStrLn "\nParse Successful!"
+      -- putStrLn "\nParse Successful!"
       -- showTree v tree
-      expEnv <- runExceptT $ execStateT (runReaderT (transProgram tree) M.empty) (M.empty, 0)
-      case expEnv of
-        Left e -> hPutStrLn stderr $ getExceptionMessage e
-        -- Right newEnv -> putStrLn $ unwords ["Środowisko", show newEnv]
-        Right _ -> putStrLn "The end"
-      exitSuccess
+      typeState <- runExceptT $ runReaderT (typeCheckProgram tree) M.empty
+      case typeState of
+        Left e -> do
+          hPutStrLn stderr $ getTypeErrorMessage e
+          exitFailure
+        Right _ -> do
+          expEnv <- runExceptT $ execStateT (runReaderT (transProgram tree) M.empty) (M.empty, 0)
+          case expEnv of
+            Left e -> do 
+              hPutStrLn stderr $ getExceptionMessage e
+              exitFailure
+            -- Right newEnv -> putStrLn $ unwords ["Środowisko", show newEnv]
+            Right _ -> do
+              exitSuccess
   where
   ts = myLexer s
 
