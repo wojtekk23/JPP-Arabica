@@ -22,6 +22,7 @@ typeError p x = lift $ throwE $ Arabica.Abs.CustomTypeError p $ show x
 throwTypeError :: Arabica.Abs.TypeCheckingError -> Arabica.Abs.TypeCheckingMonadIO b
 throwTypeError x = lift $ throwE $ x
 
+-- Type-check program
 typeCheckProgram :: Arabica.Abs.Program -> Arabica.Abs.TypeCheckingMonadIO ()
 typeCheckProgram x = case x of
   Arabica.Abs.Program _ topdefs -> do
@@ -34,6 +35,7 @@ typeCheckProgram x = case x of
       fnType <- getTopDefType topdef
       local (M.insert ident fnType) $ checkTopDefs topdefs
 
+-- Type-check top definitions (top functions including main)
 typeTopDef :: Arabica.Abs.TopDef -> Arabica.Abs.TypeCheckingMonadIO ()
 typeTopDef x = case x of
   Arabica.Abs.FnDef p type_ ident args block -> do
@@ -49,6 +51,8 @@ typeTopDef x = case x of
       let newTypeEnv = M.insert ident topDefType argsTypeEnv
       local (const newTypeEnv) $ typeBlock absType block
 
+-- Type-check block
+-- retType: type of a function the block is a part of
 typeBlock :: Arabica.Abs.AbsType -> Arabica.Abs.Block -> Arabica.Abs.TypeCheckingMonadIO ()
 typeBlock retType x = case x of
   Arabica.Abs.Block _ stmts -> runTypeStmts retType stmts
@@ -59,6 +63,8 @@ typeBlock retType x = case x of
       newEnv <- typeStmts type_ stmt
       local (const newEnv) $ runTypeStmts type_ stmts
 
+-- Type-check item declarations
+-- itemType: type of the new variable
 typeItem :: Arabica.Abs.AbsType -> Arabica.Abs.Item -> Arabica.Abs.TypeCheckingMonadIO Arabica.Abs.Ident
 typeItem itemType x = case x of
   Arabica.Abs.NoInit _ ident -> pure ident
@@ -67,6 +73,8 @@ typeItem itemType x = case x of
     if exprType == itemType then pure ident
     else throwTypeError $ Arabica.Abs.WrongInitType p ident itemType exprType
 
+-- Type-check statement
+-- fnType: AbsType of the function statement is a part of
 typeStmts :: Arabica.Abs.AbsType -> Arabica.Abs.Stmt -> Arabica.Abs.TypeCheckingMonadIO Arabica.Abs.TypeEnv
 typeStmts fnType x = case x of
   Arabica.Abs.Empty _ -> ask
@@ -156,6 +164,7 @@ typeStmts fnType x = case x of
     typeExpr expr
     ask
 
+-- Check if the AbsTypes in two lists are the same
 confirmTypes :: Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> Integer -> [Arabica.Abs.AbsType] -> [Arabica.Abs.AbsType] -> Arabica.Abs.TypeCheckingMonadIO ()
 confirmTypes _ _ _ [] [] = pure ()
 confirmTypes p ident _ _ [] = throwTypeError $ Arabica.Abs.TooManyArgsType p ident
@@ -164,6 +173,7 @@ confirmTypes p ident num (exprType:exprs) (argType:args) = do
   if exprType /= argType then throwTypeError $ Arabica.Abs.FunArgumentTypeMismatch p num ident exprType argType
   else confirmTypes p ident (num+1) exprs args
 
+-- Type-check expression
 typeExpr :: Arabica.Abs.Expr -> Arabica.Abs.TypeCheckingMonadIO Arabica.Abs.AbsType
 typeExpr x = case x of
   Arabica.Abs.EArray _ type_ _ -> pure $ Arabica.Abs.Array $ transType type_

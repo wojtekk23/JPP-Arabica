@@ -43,6 +43,7 @@ defaultVal type_ = case type_ of
   Arabica.Abs.Array arrType -> pure $ Arabica.Abs.ArrVal arrType (array (0,0) [])
   _ -> failure Nothing "Na razie domyślne wartości mają inty, stringi, boole i tablice"
 
+-- Check if the type of LocVal and AbsType match
 conformValType :: Arabica.Abs.LocVal -> Arabica.Abs.AbsType -> Bool
 conformValType (Arabica.Abs.IntegerVal _) Arabica.Abs.Int = True
 conformValType (Arabica.Abs.BoolVal _) Arabica.Abs.Bool = True
@@ -63,6 +64,7 @@ getTypeFromVal x = case x of
   Arabica.Abs.FunVal retType absArgs _ _ -> Arabica.Abs.Fun retType $ map (\(Arabica.Abs.AbsArg argType _) -> argType) absArgs
   Arabica.Abs.ArrVal arrType _ -> Arabica.Abs.Array arrType
 
+-- End the statement without a return value nor a special loop state
 normalPass :: Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
 normalPass = do
   varEnv <- ask

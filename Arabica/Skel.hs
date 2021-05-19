@@ -16,6 +16,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Except
 
+-- Initialize function arguments with values caclulated from given expression 
 assignArgsToVals :: Arabica.Abs.VarEnv -> Arabica.Abs.BNFC'Position -> Arabica.Abs.Ident -> [Arabica.Abs.Expr] -> [Arabica.Abs.AbsArg] -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
 assignArgsToVals _ _ _ [] [] = ask
 assignArgsToVals _ p ident _ [] = errorMessage $ Arabica.Abs.TooManyArgs p ident
@@ -25,6 +26,7 @@ assignArgsToVals oldEnv p ident (e:es) ((Arabica.Abs.AbsArg type_ ident_):as) = 
   newVarEnv <- newVariable False ident_ val
   local (const newVarEnv) $ assignArgsToVals oldEnv p ident es as
 
+-- Translate program
 transProgram :: Arabica.Abs.Program -> Arabica.Abs.InterpretingMonadIO ()
 transProgram x = case x of
   Arabica.Abs.Program _ topdefs -> do
@@ -35,6 +37,7 @@ transProgram x = case x of
       (varEnv, _) <- transTopDef def
       local (const varEnv) $ runTopDefs defs
 
+-- Translate top definitions
 transTopDef :: Arabica.Abs.TopDef -> Arabica.Abs.InterpretingMonadIO (Arabica.Abs.VarEnv, Arabica.Abs.ReturnVal)
 transTopDef x = case x of
   Arabica.Abs.FnDef p type_ ident args block -> do
@@ -54,6 +57,8 @@ transTopDef x = case x of
         Nothing -> errorMessage $ Arabica.Abs.NoValueReturned p ident absType
     else pure $ (newVarEnv, Nothing)
 
+-- translate Block
+-- inLoop: whether the block is a part of any loop
 transBlock :: Bool -> Arabica.Abs.Block -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
 transBlock inLoop x = case x of
   Arabica.Abs.Block _ stmts -> do
@@ -72,6 +77,8 @@ transBlock inLoop x = case x of
               _ -> pure $ (varEnv, retVal, loopState)
           else local (const newVarEnv) $ runStmts varEnv stmts
 
+-- Translate statement
+-- inLoop: whether statement is inside of any loop
 transStmt :: Bool -> Arabica.Abs.Stmt -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.StmtState
 transStmt inLoop x = case x of
   Arabica.Abs.Empty _ -> normalPass
@@ -175,6 +182,9 @@ transStmt inLoop x = case x of
       _ -> failure p "Can only print integers, booleans and strings"
     normalPass
 
+-- Translate item declaration
+-- valType: type of the initialized variable
+-- readOnly: whether the new variable is read-only or not
 transItem :: Arabica.Abs.AbsType -> Bool -> Arabica.Abs.Item -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.VarEnv
 transItem valType readOnly x = case x of
   Arabica.Abs.NoInit p ident -> do
@@ -186,6 +196,7 @@ transItem valType readOnly x = case x of
     newVarEnv <- newVariable readOnly ident val
     pure $ newVarEnv
 
+-- translate expression
 transExpr :: Arabica.Abs.Expr -> Arabica.Abs.InterpretingMonadIO Arabica.Abs.LocVal
 transExpr x = case x of
   Arabica.Abs.EArray _ type_ integer -> do
@@ -263,11 +274,15 @@ transExpr x = case x of
       b2 <- transExpr expr2
       pure $ b2
 
+-- Translate add/subtract operations
+-- n1, n2: two operands
 transAddOp :: Arabica.Abs.AddOp -> Integer -> Integer -> Arabica.Abs.Result
 transAddOp x n1 n2 = case x of
   Arabica.Abs.Plus _ -> pure $ Arabica.Abs.IntegerVal $ n1 + n2
   Arabica.Abs.Minus _ -> pure $ Arabica.Abs.IntegerVal $ n1 - n2
 
+-- Translate multiply/divide operations
+-- n1, n2: two operands
 transMulOp :: Arabica.Abs.MulOp -> Integer -> Integer -> Arabica.Abs.Result
 transMulOp x n1 n2 = case x of
   Arabica.Abs.Times _ -> pure $ Arabica.Abs.IntegerVal $ n1 * n2
@@ -277,6 +292,8 @@ transMulOp x n1 n2 = case x of
     else
       pure $ Arabica.Abs.IntegerVal $ n1 `div` n2
 
+-- Translate relations
+-- n1, n2: two operands
 transRelOp :: Arabica.Abs.RelOp -> Integer -> Integer -> Arabica.Abs.Result
 transRelOp x n1 n2 = case x of
   Arabica.Abs.LTH _ -> pure $ Arabica.Abs.BoolVal $ n1 < n2

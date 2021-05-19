@@ -37,6 +37,7 @@ type Arg = Arg' BNFC'Position
 data Arg' a = Arg a (Type' a) Ident
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
+-- Abstract version of Arg (without position)
 data AbsArg = AbsArg AbsType Ident
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
@@ -79,6 +80,7 @@ data Type' a
     | ArrayType a (Type' a)
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
+-- Abstract version of Type (without position)
 data AbsType
     = Int
     | Str
@@ -126,14 +128,19 @@ newtype Ident = Ident String
 instance C.Show Ident where
   show (Ident str) = C.show str
 
+-- Variable Environment - values take the form: (Location, whether the variable is read-only)
 type VarEnv = M.Map Ident (Location, Bool)
+-- Location Environment (State)
 type LocEnv = M.Map Location LocVal
+-- Type Environment (used during typechecking)
 type TypeEnv = M.Map Ident AbsType
+-- A wrapper of Location Environment and the first unused location id
 type LocMemory = (LocEnv, Location)
-type ExpM a = ReaderT VarEnv Maybe a
 
+-- Closure: maps from variables to values directly
 type Closure = M.Map Ident LocVal
 
+-- Value of an expression or variable
 data LocVal = BoolVal Bool | IntegerVal Integer | StringVal String | VoidVal | FunVal AbsType [AbsArg] Block Closure | ArrVal AbsType (Array Integer LocVal)
   deriving (C.Show)
 
@@ -184,9 +191,13 @@ data TypeCheckingError
 
 type ReturnVal = Maybe LocVal
 
+-- Monad used for interpreter
 type InterpretingMonadIO = ReaderT Arabica.Abs.VarEnv (StateT Arabica.Abs.LocMemory (ExceptT Arabica.Abs.Exception IO))
+-- Monad used for type checking
 type TypeCheckingMonadIO = ReaderT Arabica.Abs.TypeEnv (ExceptT Arabica.Abs.TypeCheckingError IO)
 type Result = InterpretingMonadIO LocVal
+-- Statement state: state after executing a statement
+-- (Variable environment, returned value (if any), loop state (break, continue or none))
 type StmtState = (Arabica.Abs.VarEnv, Arabica.Abs.ReturnVal, Arabica.Abs.LoopState)
 
 data LoopState = BreakState | ContState | NoLoopState
