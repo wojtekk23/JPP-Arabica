@@ -1,6 +1,6 @@
 # Język Arabica
 
-Język Arabica jest imperatywnym językiem wzorowanym na języku Latte.
+Język Arabica jest imperatywnym językiem wzorowanym na języku [Latte](https://www.mimuw.edu.pl/~ben/Zajecia/Mrj2020/Latte/).
 
 ## Struktura programu
 
