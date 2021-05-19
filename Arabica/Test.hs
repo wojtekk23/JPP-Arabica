@@ -38,7 +38,7 @@ putStrV :: Verbosity -> String -> IO ()
 putStrV v s = when (v > 1) $ putStrLn s
 
 runFile :: Verbosity -> ParseFun Arabica.Abs.Program -> FilePath -> IO ()
-runFile v p f = putStrLn f >> readFile f >>= runProgram v p
+runFile v p f = readFile f >>= runProgram v p
 
 addPositionToExceptionMessage :: Arabica.Abs.BNFC'Position -> String -> String
 addPositionToExceptionMessage p s = 
