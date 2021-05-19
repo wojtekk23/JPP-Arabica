@@ -158,8 +158,8 @@ typeStmts fnType x = case x of
           Arabica.Abs.Int -> do
             local (M.insert ident Arabica.Abs.Int) $ typeStmts fnType stmt
             ask
-          _ -> throwTypeError $ Arabica.Abs.WrongForBeginType p
-      _ -> throwTypeError $ Arabica.Abs.WrongForEndType p
+          _ -> throwTypeError $ Arabica.Abs.WrongForEndType p
+      _ -> throwTypeError $ Arabica.Abs.WrongForBeginType p
   Arabica.Abs.Print _ expr -> do
     typeExpr expr
     ask
