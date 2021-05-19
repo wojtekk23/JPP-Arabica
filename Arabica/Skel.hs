@@ -199,7 +199,7 @@ transStmt inLoop x = case x of
     case val of
       Arabica.Abs.IntegerVal n -> lift $ lift $ lift $ putStrLn $ show n
       Arabica.Abs.BoolVal b -> lift $ lift $ lift $ putStrLn $ show b
-      Arabica.Abs.StringVal s -> lift $ lift $ lift $ putStrLn $ show s
+      Arabica.Abs.StringVal s -> lift $ lift $ lift $ putStrLn $ s
       _ -> failure p "Can only print integers, booleans and strings"
     normalPass
 
