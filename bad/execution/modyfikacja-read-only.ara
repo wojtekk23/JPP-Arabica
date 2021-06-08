@@ -1,0 +1,9 @@
+int main() {
+    int x = 10;
+    for i = 0 to x do {
+        print(x);
+        x = x + 1;
+        i = i + 1;
+    }
+    return 13;
+}
